@@ -1,3 +1,10 @@
+## [1.0.5](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.0.4...v1.0.5) (2026-08-18)
+
+### Maintenance
+
+- keep the README version badge synchronized automatically during release preparation
+- avoid stale Marketplace versions caused by GitHub image caching
+
 ## [1.0.4](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.0.3...v1.0.4) (2026-08-17)
 
 ### Testing

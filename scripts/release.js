@@ -3,6 +3,8 @@
 "use strict";
 
 const { execFileSync, spawnSync } = require("node:child_process");
+const { readFileSync, writeFileSync } = require("node:fs");
+const { join } = require("node:path");
 
 const RELEASE_RANK = Object.freeze({ patch: 1, minor: 2, major: 3 });
 const TYPE_IMPACT = Object.freeze({
@@ -117,6 +119,23 @@ function resolveReleaseType(messages, requestedType) {
   return requestedType;
 }
 
+function updateReadmeVersionBadge(
+  version,
+  readFile = readFileSync,
+  writeFile = writeFileSync,
+  readmePath = join(process.cwd(), "README.md")
+) {
+  const readme = readFile(readmePath, "utf8");
+  const badgePattern = /\[!\[Version\]\([^)]+\)\]\(https:\/\/marketplace\.visualstudio\.com\/items\?itemName=SergioSuarezGil\.omnimem\)/;
+  const badge = `[![Version](https://img.shields.io/badge/VS%20Marketplace-v${version}-007ACC?logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=SergioSuarezGil.omnimem)`;
+
+  if (!badgePattern.test(readme)) {
+    throw new Error("README.md does not contain the expected Marketplace version badge.");
+  }
+
+  writeFile(readmePath, readme.replace(badgePattern, badge), "utf8");
+}
+
 function prepareRelease(requestedType = "auto", dependencies = {}) {
   const {
     assertBranch = assertReleaseBranch,
@@ -128,6 +147,7 @@ function prepareRelease(requestedType = "auto", dependencies = {}) {
     execute = run,
     platform = process.platform,
     readVersion = () => require(`${process.cwd()}/package.json`).version,
+    updateBadge = updateReadmeVersionBadge,
     logger = console,
   } = dependencies;
 
@@ -149,11 +169,12 @@ function prepareRelease(requestedType = "auto", dependencies = {}) {
   execute(npmCommand, ["test"]);
   execute(npmCommand, ["run", "package"]);
   execute(npmCommand, ["version", releaseType, "--no-git-tag-version"]);
-  execute(npmCommand, ["run", "changelog:generate"]);
 
   const version = readVersion();
+  updateBadge(version);
+  execute(npmCommand, ["run", "changelog:generate"]);
   logger.log(`\nRelease v${version} is prepared locally.`);
-  logger.log("Review package.json, package-lock.json, and CHANGELOG.md before committing.");
+  logger.log("Review package.json, package-lock.json, README.md, and CHANGELOG.md before committing.");
   logger.log("No commit, tag, push, merge, or publication was performed.");
 }
 
@@ -177,5 +198,6 @@ module.exports = {
   classifyCommit,
   determineReleaseType,
   resolveReleaseType,
+  updateReadmeVersionBadge,
   prepareRelease,
 };
