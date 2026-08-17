@@ -1,0 +1,89 @@
+{
+  "name": "omnimem",
+  "displayName": "OmniMem – IDE RAM Monitor",
+  "description": "Universal real-time RAM & process monitor for VS Code, Cursor, Windsurf, Devin, Trae and other forks. Shows memory in the status bar and detects duplicate extension versions.",
+  "version": "1.0.0",
+  "publisher": "local",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "memory",
+    "ram",
+    "monitor",
+    "cursor",
+    "windsurf",
+    "devin",
+    "trae",
+    "performance",
+    "status bar"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "memoryMonitor.refresh",
+        "title": "OmniMem: Refresh Memory Usage"
+      },
+      {
+        "command": "memoryMonitor.checkDuplicateExtensions",
+        "title": "OmniMem: Check Duplicate Extensions"
+      }
+    ],
+    "configuration": {
+      "title": "OmniMem",
+      "properties": {
+        "memoryMonitor.refreshIntervalMs": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 1000,
+          "description": "How often (in milliseconds) to refresh the memory usage shown in the status bar."
+        },
+        "memoryMonitor.displayFormat": {
+          "type": "string",
+          "enum": [
+            "used/total",
+            "usedOnly",
+            "percentage",
+            "compact"
+          ],
+          "enumDescriptions": [
+            "Shows used RAM vs total system RAM (e.g. 1.5GB/16.0GB)",
+            "Shows only editor RAM usage (e.g. 1.5GB)",
+            "Shows percentage of total system RAM used (e.g. 9.4%)",
+            "Shows used RAM and percentage in a compact format (e.g. 1.5GB (9%))"
+          ],
+          "default": "used/total",
+          "description": "Format for displaying memory usage in the status bar."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node --test",
+    "test:coverage": "npm run compile && node --test --experimental-test-coverage",
+    "package": "npx @vscode/vsce package --no-yarn --skip-license -o omnimem-1.0.0.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
+    "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "undici": "^6.21.1"
+  }
+}

@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Compilation Output
+out/
+dist/
+*.tsbuildinfo
+
+# Package Bundles
+*.vsix
+
+# Logs & Runtime Data
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test & Coverage
+.vscode-test/
+coverage/
+
+# OS Specific
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Editor & AI Tool temporary files
+.qodo/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

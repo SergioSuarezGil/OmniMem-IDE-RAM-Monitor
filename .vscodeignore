@@ -1,0 +1,13 @@
+.gitignore
+.vscodeignore
+.git/**
+.vscode-test/**
+src/**
+test/**
+tsconfig.json
+*.vsix
+*.log
+.DS_Store
+Thumbs.db
+.qodo/**
+.idea/**
