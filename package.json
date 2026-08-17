@@ -4,6 +4,7 @@
   "description": "Universal real-time RAM & process monitor for VS Code, Cursor, Windsurf, Devin, Trae and other forks. Shows memory in the status bar and detects duplicate extension versions.",
   "version": "1.0.0",
   "publisher": "SergioSuarezGil",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor"
@@ -76,7 +77,8 @@
     "test": "npm run compile && node --test",
     "test:coverage": "npm run compile && node --test --experimental-test-coverage",
     "package": "npx @vscode/vsce package --no-yarn --skip-license",
-    "changelog:generate": "conventional-changelog -p conventionalcommits -i CHANGELOG.md -s -r 0"
+    "changelog:generate": "conventional-changelog -p conventionalcommits -i CHANGELOG.md -s -r 0",
+    "publish:ovsx:local": "bash scripts/publish-ovsx-local.sh"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

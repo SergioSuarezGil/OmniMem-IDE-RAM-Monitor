@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   release-and-publish:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor == 'SergioSuarezGil'
     runs-on: ubuntu-latest
     env:
       OVSX_PAT: ${{ secrets.OVSX_PAT }}
