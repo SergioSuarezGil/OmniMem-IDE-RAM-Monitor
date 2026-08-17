@@ -7,31 +7,135 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-main
   cancel-in-progress: false
 
 jobs:
-  release-and-publish:
-    if: github.actor == 'SergioSuarezGil'
+  build-package:
+    if: github.actor == 'SergioSuarezGil' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      should_publish: ${{ steps.version.outputs.should_publish }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
+      - name: Validate release version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          if git rev-parse --quiet --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Version $VERSION is already tagged. Nothing to publish."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! grep -Fq "## [$VERSION]" CHANGELOG.md; then
+            echo "CHANGELOG.md has no release section for version $VERSION."
+            echo "Prepare the version and changelog in the pull request before merging it into main."
+            exit 1
+          fi
+
+          echo "should_publish=true" >> "$GITHUB_OUTPUT"
+
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        if: steps.version.outputs.should_publish == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.version.outputs.should_publish == 'true'
+        run: npm ci
+
+      - name: Run tests
+        if: steps.version.outputs.should_publish == 'true'
+        run: npm test
+
+      - name: Package VSIX
+        if: steps.version.outputs.should_publish == 'true'
+        run: npx @vscode/vsce package --no-yarn --skip-license
+
+      - name: Detect VSIX file
+        if: steps.version.outputs.should_publish == 'true'
+        id: vsix
+        run: |
+          VSIX_FILE=$(ls -1 *.vsix | head -n 1)
+          if [ -z "$VSIX_FILE" ]; then
+            echo "No VSIX package was generated."
+            exit 1
+          fi
+          echo "file=$VSIX_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes from changelog section
+        if: steps.version.outputs.should_publish == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          awk -v ver="$VERSION" '
+            BEGIN {capture=0}
+            $0 ~ "^## \\[" ver "\\]" {capture=1; print; next}
+            $0 ~ "^## \\[" && capture==1 {exit}
+            capture==1 {print}
+          ' CHANGELOG.md > RELEASE_NOTES.md
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "No release notes found for $VERSION."
+            exit 1
+          fi
+
+      - name: Upload release artifacts
+        if: steps.version.outputs.should_publish == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-artifacts
+          path: |
+            ${{ steps.vsix.outputs.file }}
+            RELEASE_NOTES.md
+          if-no-files-found: error
+
+  publish-marketplaces:
+    needs: build-package
+    if: needs.build-package.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: marketplace-production
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-artifacts
+          path: .
 
       - name: Validate publisher and required secrets
         env:
@@ -45,77 +149,14 @@ jobs:
           fi
 
           if [ -z "$VSCE_PAT" ]; then
-            echo "Missing VSCE_PAT secret in repository settings."
+            echo "Missing VSCE_PAT secret in the marketplace-production environment."
             exit 1
           fi
 
           if [ -z "$OVSX_PAT" ]; then
-            echo "Missing OVSX_PAT secret in repository settings."
+            echo "Missing OVSX_PAT secret in the marketplace-production environment."
             exit 1
           fi
-
-      - name: Run tests
-        run: npm test
-
-      - name: Configure Git user
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Bump patch version
-        id: version
-        run: |
-          npm version patch --no-git-tag-version
-          VERSION=$(node -p "require('./package.json').version")
-          TAG="v$VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Generate changelog from conventional commits
-        run: npm run changelog:generate
-
-      - name: Commit version and changelog
-        run: |
-          git add package.json package-lock.json CHANGELOG.md
-          git commit -m "chore(release): ${{ steps.version.outputs.tag }} [skip ci]"
-          git tag "${{ steps.version.outputs.tag }}"
-
-      - name: Push commit and tag
-        run: |
-          git push origin main
-          git push origin "${{ steps.version.outputs.tag }}"
-
-      - name: Package VSIX
-        run: npx @vscode/vsce package --no-yarn --skip-license
-
-      - name: Detect VSIX file
-        id: vsix
-        run: |
-          VSIX_FILE=$(ls -1 *.vsix | head -n 1)
-          echo "file=$VSIX_FILE" >> "$GITHUB_OUTPUT"
-
-      - name: Build release notes from changelog section
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          awk -v ver="$VERSION" '
-            BEGIN {capture=0}
-            $0 ~ "^## \\[" ver "\\]" {capture=1; print; next}
-            $0 ~ "^## \\[" && capture==1 {exit}
-            capture==1 {print}
-          ' CHANGELOG.md > RELEASE_NOTES.md
-
-          if [ ! -s RELEASE_NOTES.md ]; then
-            echo "## ${{ steps.version.outputs.tag }}" > RELEASE_NOTES.md
-            echo "Automated release." >> RELEASE_NOTES.md
-          fi
-
-      - name: Create GitHub Release and upload VSIX
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
-          body_path: RELEASE_NOTES.md
-          files: ${{ steps.vsix.outputs.file }}
 
       - name: Publish to VS Code Marketplace
         id: publish_vsce
@@ -123,9 +164,10 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
+          VSIX_FILE=$(ls -1 *.vsix | head -n 1)
           for ATTEMPT in 1 2 3; do
             set +e
-            OUTPUT=$(npx @vscode/vsce publish --packagePath "${{ steps.vsix.outputs.file }}" --pat "$VSCE_PAT" 2>&1)
+            OUTPUT=$(npx @vscode/vsce publish --packagePath "$VSIX_FILE" --pat "$VSCE_PAT" 2>&1)
             STATUS=$?
             set -e
             echo "$OUTPUT"
@@ -152,7 +194,9 @@ jobs:
         continue-on-error: true
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
-        run: npx ovsx publish "${{ steps.vsix.outputs.file }}" -p "$OVSX_PAT"
+        run: |
+          VSIX_FILE=$(ls -1 *.vsix | head -n 1)
+          npx --no-install ovsx publish "$VSIX_FILE" -p "$OVSX_PAT"
 
       - name: Verify marketplace publication results
         if: always()
@@ -171,3 +215,38 @@ jobs:
           if [ "$VSCE_OUTCOME" != "success" ] || [ "$OVSX_OUTCOME" != "success" ]; then
             exit 1
           fi
+
+  create-github-release:
+    needs:
+      - build-package
+      - publish-marketplaces
+    if: needs.build-package.outputs.should_publish == 'true' && needs.publish-marketplaces.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-artifacts
+          path: .
+
+      - name: Detect VSIX file
+        id: vsix
+        run: |
+          VSIX_FILE=$(ls -1 *.vsix | head -n 1)
+          if [ -z "$VSIX_FILE" ]; then
+            echo "No VSIX package was downloaded."
+            exit 1
+          fi
+          echo "file=$VSIX_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release and upload VSIX
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          tag_name: ${{ needs.build-package.outputs.tag }}
+          name: ${{ needs.build-package.outputs.tag }}
+          body_path: RELEASE_NOTES.md
+          files: ${{ steps.vsix.outputs.file }}
