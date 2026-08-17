@@ -79,6 +79,7 @@
     "test": "npm run compile && node --test",
     "test:coverage": "npm run compile && node --test --experimental-test-coverage",
     "package": "npx @vscode/vsce package --no-yarn --skip-license",
+    "release": "node scripts/release.js",
     "changelog:generate": "conventional-changelog -p conventionalcommits -i CHANGELOG.md -s -r 0",
     "publish:ovsx:local": "bash scripts/publish-ovsx-local.sh",
     "publish:vscode:local": "bash scripts/publish-vscode-local.sh"

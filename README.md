@@ -4,7 +4,7 @@
 
 **Universal, lightweight real-time memory & process monitor for VS Code, Cursor, Windsurf, Devin Desktop, Trae, VSCodium, and other forks.**
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/visual-studio-marketplace/v/SergioSuarezGil.omnimem?label=version)](https://marketplace.visualstudio.com/items?itemName=SergioSuarezGil.omnimem)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20runtime-brightgreen.svg)]()
 [![Tested with Node](https://img.shields.io/badge/tests-node%3Atest-informational.svg)]()
@@ -104,7 +104,7 @@ OmniMem identifies processes using runtime introspection rather than hardcoded p
 ### From GitHub Releases (recommended)
 
 1. Open the repository Releases section.
-2. Download the `.vsix` attached to the version you want (for example `omnimem-1.0.0.vsix`).
+2. Download the `.vsix` attached to the version you want (for example `omnimem-x.y.z.vsix`).
 3. Install it from your editor UI (_Extensions -> Install from VSIX..._) or with CLI.
 
 ### From VSIX Package
@@ -117,69 +117,50 @@ OmniMem identifies processes using runtime introspection rather than hardcoded p
 
 ```bash
 # VS Code
-code --install-extension omnimem-1.0.0.vsix
+code --install-extension omnimem-x.y.z.vsix
 
 # Cursor
-cursor --install-extension omnimem-1.0.0.vsix
+cursor --install-extension omnimem-x.y.z.vsix
 
 # Windsurf
-windsurf --install-extension omnimem-1.0.0.vsix
+windsurf --install-extension omnimem-x.y.z.vsix
 
 # Devin Desktop
-devin-desktop --install-extension omnimem-1.0.0.vsix
+devin-desktop --install-extension omnimem-x.y.z.vsix
 ```
 
 ---
 
 ## 🚀 Release Process
 
-This repository is configured to auto-publish on every push to `main`:
-
-- Bumps patch version automatically (`X.Y.Z` -> `X.Y.(Z+1)`).
-- Generates `CHANGELOG.md` from Conventional Commits.
-- Creates a GitHub Release with typed release notes.
-- Builds and attaches the `.vsix` asset.
-- Publishes to VS Code Marketplace.
-- Publishes to Open VSX for VSCodium and compatible forks.
+Development follows a lightweight Git Flow: feature branches are integrated into `develop`, releases are prepared locally, and only the maintainer promotes `develop` to `main`.
 
 ### Required repository secrets
 
 - `VSCE_PAT`: Personal Access Token for VS Code Marketplace publishing.
 - `OVSX_PAT`: Personal Access Token for Open VSX publishing.
 
-### Main branch release flow
+### Preparing and publishing a release
+
+Run the release script from a clean `develop` branch:
 
 ```bash
-# Every push to main triggers release+publish automatically
-git checkout main
-git pull origin main
-git merge <your-branch>
-git push origin main
+# Infer patch, minor, or major from commits since the latest version tag
+npm run release
+
+# Optionally request an equal or higher version increment
+npm run release -- minor
 ```
 
-Workflow `.github/workflows/release.yml` handles versioning, changelog, tag creation, release generation, and publishing.
+The script verifies the branch history, runs tests, packages the extension, updates the version, and generates `CHANGELOG.md`. It does not commit, tag, push, merge, or publish anything.
+
+After reviewing and committing the generated files, push `develop` and merge it into `main`. A push to `main` runs `.github/workflows/release.yml`, which validates the prepared version, publishes to both marketplaces, and creates the tag and GitHub Release.
 
 ### About VS Code Marketplace vs other editors
 
 - **VS Code / Cursor / Windsurf / Devin / Trae**: many forks can install VSIX directly, and some also consume Marketplace-compatible sources.
 - **VSCodium** usually relies on **Open VSX**, not Microsoft Marketplace.
 - Publishing to both **VS Code Marketplace** and **Open VSX** maximizes compatibility and avoids manual duplication.
-
-### Local Open VSX Publishing Script
-
-If you want to manually publish a build to Open VSX from your local machine:
-
-```bash
-# Option A: With environment variable (Linux / Windows / macOS)
-export OVSX_PAT="your-token"
-npm run publish:ovsx:local
-
-# Option B: On macOS using Keychain (token is retrieved automatically)
-security add-generic-password -a "$USER" -s ovsx_pat -w
-npm run publish:ovsx:local
-```
-
----
 
 ## 🛠️ Development & Testing
 
@@ -199,6 +180,30 @@ npm run test:coverage
 
 # Build VSIX package
 npm run package
+```
+
+### Commit types and release impact
+
+The release process uses Conventional Commit types to determine whether a new version is required and which version component to increment.
+
+| Commit type | Release impact |
+| --- | --- |
+| `feat:` | Minor |
+| `fix:` | Patch |
+| `perf:` | Patch |
+| `refactor:` | Patch |
+| `feat!:` or `BREAKING CHANGE:` | Major |
+| `docs:` | No release |
+| `test:` | No release |
+| `ci:` | No release |
+| `chore:` | Patch |
+| `style:` | No release |
+| `infra:` | No release |
+
+Add `[skip release]` to a commit message when a normally publishable change should not create a new release:
+
+```text
+fix: adjust development-only diagnostics [skip release]
 ```
 
 ---
