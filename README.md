@@ -23,15 +23,10 @@ Unlike existing memory monitors that hardcode binary names (breaking as soon as 
 
 ## 📸 Screenshots
 
-<!-- REPLACE THIS WITH YOUR SCREENSHOT OR GIF -->
 <div align="center">
   <p><em>Status bar preview showing real-time memory consumption:</em></p>
-  <img src="https://raw.githubusercontent.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/main/assets/preview.png" alt="OmniMem Status Bar Preview" width="600" />
+  <img src="./assets/preview.png" alt="OmniMem Status Bar Preview" />
 </div>
-
-<!--
-> TIP: Add your screenshots or GIFs to an `assets/` folder in your repository and update the path above.
--->
 
 ---
 
@@ -50,15 +45,15 @@ Unlike existing memory monitors that hardcode binary names (breaking as soon as 
 
 Works seamlessly across all modern Electron / VS Code-based editors:
 
-| Editor | Platform Support | Status |
-| :--- | :--- | :--- |
+| Editor                 | Platform Support        | Status       |
+| :--------------------- | :---------------------- | :----------- |
 | **Visual Studio Code** | macOS / Linux / Windows | Full Support |
-| **Cursor** | macOS / Linux / Windows | Full Support |
-| **Windsurf** | macOS / Linux / Windows | Full Support |
-| **Devin Desktop** | macOS / Linux / Windows | Full Support |
-| **Trae** | macOS / Linux / Windows | Full Support |
-| **VSCodium** | macOS / Linux / Windows | Full Support |
-| **Positron** | macOS / Linux / Windows | Full Support |
+| **Cursor**             | macOS / Linux / Windows | Full Support |
+| **Windsurf**           | macOS / Linux / Windows | Full Support |
+| **Devin Desktop**      | macOS / Linux / Windows | Full Support |
+| **Trae**               | macOS / Linux / Windows | Full Support |
+| **VSCodium**           | macOS / Linux / Windows | Full Support |
+| **Positron**           | macOS / Linux / Windows | Full Support |
 
 ---
 
@@ -66,10 +61,10 @@ Works seamlessly across all modern Electron / VS Code-based editors:
 
 You can customize **OmniMem** via your editor's `settings.json` or through the Settings UI (`OmniMem`):
 
-| Setting | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `memoryMonitor.displayFormat` | `string` | `"used/total"` | Format for the status bar. Options: <br>• `"used/total"` &rarr; `1.5GB/16.0GB`<br>• `"usedOnly"` &rarr; `1.5GB`<br>• `"percentage"` &rarr; `9.4%`<br>• `"compact"` &rarr; `1.5GB (9%)` |
-| `memoryMonitor.refreshIntervalMs` | `number` | `5000` | Refresh frequency in milliseconds (minimum: `1000`). |
+| Setting                           | Type     | Default        | Description                                                                                                                                                                            |
+| :-------------------------------- | :------- | :------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `memoryMonitor.displayFormat`     | `string` | `"used/total"` | Format for the status bar. Options: <br>• `"used/total"` &rarr; `1.5GB/16.0GB`<br>• `"usedOnly"` &rarr; `1.5GB`<br>• `"percentage"` &rarr; `9.4%`<br>• `"compact"` &rarr; `1.5GB (9%)` |
+| `memoryMonitor.refreshIntervalMs` | `number` | `5000`         | Refresh frequency in milliseconds (minimum: `1000`).                                                                                                                                   |
 
 ---
 
@@ -103,7 +98,7 @@ OmniMem identifies processes using runtime introspection rather than hardcoded p
    ```bash
    npm run package
    ```
-2. Install it in your editor of choice via CLI or through the UI (*Extensions &rarr; Install from VSIX...*):
+2. Install it in your editor of choice via CLI or through the UI (_Extensions &rarr; Install from VSIX..._):
 
 ```bash
 # VS Code
