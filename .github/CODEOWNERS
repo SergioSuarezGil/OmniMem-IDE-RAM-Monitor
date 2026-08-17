@@ -1,0 +1,6 @@
+# Default owners for all files
+* @SergioSuarezGil
+
+# Require review for documentation and release-related files
+*.md @SergioSuarezGil
+/.github/ @SergioSuarezGil
