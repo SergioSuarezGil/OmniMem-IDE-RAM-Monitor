@@ -92,6 +92,12 @@ OmniMem identifies processes using runtime introspection rather than hardcoded p
 
 ## 📦 Installation
 
+### From GitHub Releases (recommended)
+
+1. Open the repository Releases section.
+2. Download the `.vsix` attached to the version you want (for example `omnimem-1.0.0.vsix`).
+3. Install it from your editor UI (_Extensions -> Install from VSIX..._) or with CLI.
+
 ### From VSIX Package
 
 1. Package or download the `.vsix` file:
@@ -113,6 +119,31 @@ windsurf --install-extension omnimem-1.0.0.vsix
 # Devin Desktop
 devin-desktop --install-extension omnimem-1.0.0.vsix
 ```
+
+---
+
+## 🚀 Release Process
+
+This repository is configured to create a GitHub Release and upload the `.vsix` automatically when you push a semantic version tag.
+
+### Create a new release
+
+```bash
+# Ensure you are up to date
+git checkout main
+git pull origin main
+
+# Update version in package.json if needed, then commit
+git add package.json package-lock.json
+git commit -m "chore: bump version to 1.0.1"
+git push origin main
+
+# Create and push the tag
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+Once the tag is pushed, workflow `.github/workflows/release.yml` builds the extension and publishes the `.vsix` in Releases.
 
 ---
 
