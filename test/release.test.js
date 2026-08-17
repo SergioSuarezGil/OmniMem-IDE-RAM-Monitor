@@ -55,7 +55,7 @@ test("resolveReleaseType accepts automatic or higher explicit increments", () =>
 
 test("run and captureGit execute commands with captured output", () => {
   assert.equal(run(process.execPath, ["-e", "process.stdout.write('ok')"], { capture: true }), "ok");
-  assert.equal(captureGit(["branch", "--show-current"]), "develop");
+  assert.equal(captureGit(["rev-parse", "--is-inside-work-tree"]), "true");
 });
 
 test("release preconditions validate branch and working tree", () => {
