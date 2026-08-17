@@ -8,6 +8,9 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20runtime-brightgreen.svg)]()
 [![Tested with Node](https://img.shields.io/badge/tests-node%3Atest-informational.svg)]()
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-007ACC?logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=SergioSuarezGil.omnimem)
+[![Open VSX](https://img.shields.io/badge/Open%20VSX-Registry-C160EF?logo=eclipseide&logoColor=white)](https://open-vsx.org/extension/SergioSuarezGil/omnimem)
+[![GitHub Releases](https://img.shields.io/badge/Download-VSIX-181717?logo=github&logoColor=white)](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/releases)
 
 </div>
 
@@ -91,6 +94,12 @@ OmniMem identifies processes using runtime introspection rather than hardcoded p
 ---
 
 ## 📦 Installation
+
+### Marketplace Links
+
+- VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=SergioSuarezGil.omnimem
+- Open VSX Registry: https://open-vsx.org/extension/SergioSuarezGil/omnimem
+- GitHub Releases (VSIX): https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/releases
 
 ### From GitHub Releases (recommended)
 
