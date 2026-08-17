@@ -140,12 +140,12 @@ This repository is configured to auto-publish on every push to `main`:
 - Creates a GitHub Release with typed release notes.
 - Builds and attaches the `.vsix` asset.
 - Publishes to VS Code Marketplace.
-- Optionally publishes to Open VSX (recommended for VSCodium and compatible forks).
+- Publishes to Open VSX for VSCodium and compatible forks.
 
 ### Required repository secrets
 
 - `VSCE_PAT`: Personal Access Token for VS Code Marketplace publishing.
-- `OVSX_PAT` (optional): Personal Access Token for Open VSX publishing.
+- `OVSX_PAT`: Personal Access Token for Open VSX publishing.
 
 ### Main branch release flow
 

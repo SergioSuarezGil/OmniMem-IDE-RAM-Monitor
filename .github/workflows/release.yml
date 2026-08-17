@@ -17,8 +17,6 @@ jobs:
   release-and-publish:
     if: github.actor == 'SergioSuarezGil'
     runs-on: ubuntu-latest
-    env:
-      OVSX_PAT: ${{ secrets.OVSX_PAT }}
 
     steps:
       - name: Checkout
@@ -38,6 +36,7 @@ jobs:
       - name: Validate publisher and required secrets
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
           PUBLISHER=$(node -p "require('./package.json').publisher")
           if [ "$PUBLISHER" = "local" ]; then
@@ -47,6 +46,11 @@ jobs:
 
           if [ -z "$VSCE_PAT" ]; then
             echo "Missing VSCE_PAT secret in repository settings."
+            exit 1
+          fi
+
+          if [ -z "$OVSX_PAT" ]; then
+            echo "Missing OVSX_PAT secret in repository settings."
             exit 1
           fi
 
@@ -114,10 +118,56 @@ jobs:
           files: ${{ steps.vsix.outputs.file }}
 
       - name: Publish to VS Code Marketplace
+        id: publish_vsce
+        continue-on-error: true
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx @vscode/vsce publish --no-yarn --skip-license --pat "$VSCE_PAT"
+        run: |
+          for ATTEMPT in 1 2 3; do
+            set +e
+            OUTPUT=$(npx @vscode/vsce publish --packagePath "${{ steps.vsix.outputs.file }}" --pat "$VSCE_PAT" 2>&1)
+            STATUS=$?
+            set -e
+            echo "$OUTPUT"
 
-      - name: Publish to Open VSX (optional)
-        if: ${{ env.OVSX_PAT != '' }}
+            if [ "$STATUS" -eq 0 ]; then
+              exit 0
+            fi
+
+            if ! echo "$OUTPUT" | grep -q "TF10216"; then
+              exit "$STATUS"
+            fi
+
+            if [ "$ATTEMPT" -lt 3 ]; then
+              WAIT_SECONDS=$((ATTEMPT * 20))
+              echo "VS Marketplace is temporarily unavailable. Retrying in ${WAIT_SECONDS}s..."
+              sleep "$WAIT_SECONDS"
+            fi
+          done
+
+          exit 1
+
+      - name: Publish to Open VSX
+        id: publish_ovsx
+        continue-on-error: true
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: npx ovsx publish "${{ steps.vsix.outputs.file }}" -p "$OVSX_PAT"
+
+      - name: Verify marketplace publication results
+        if: always()
+        env:
+          VSCE_OUTCOME: ${{ steps.publish_vsce.outcome }}
+          OVSX_OUTCOME: ${{ steps.publish_ovsx.outcome }}
+        run: |
+          if [ "$VSCE_OUTCOME" != "success" ]; then
+            echo "VS Code Marketplace publication failed."
+          fi
+
+          if [ "$OVSX_OUTCOME" != "success" ]; then
+            echo "Open VSX publication failed."
+          fi
+
+          if [ "$VSCE_OUTCOME" != "success" ] || [ "$OVSX_OUTCOME" != "success" ]; then
+            exit 1
+          fi
