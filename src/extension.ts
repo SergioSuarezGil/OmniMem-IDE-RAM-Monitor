@@ -55,7 +55,7 @@ export const reportDuplicateExtensions = (
 ): void => {
   if (extensionContext.extensionMode === vscode.ExtensionMode.Development) {
     vscode.window.showWarningMessage(
-      'Memory Monitor is running in Development mode. Extension duplicate scanning requires the extension to be installed in the editor extensions directory.'
+      'OmniMem is running in Development mode. Extension duplicate scanning requires the extension to be installed in the editor extensions directory.'
     );
     return;
   }
@@ -85,7 +85,7 @@ export const reportDuplicateExtensions = (
 
 export function activate(context: vscode.ExtensionContext): void {
   const statusBarItem = buildStatusBarItem();
-  const outputChannel = vscode.window.createOutputChannel('Memory Monitor');
+  const outputChannel = vscode.window.createOutputChannel('OmniMem');
   context.subscriptions.push(statusBarItem, outputChannel);
 
   const refresh = () => refreshStatusBar(statusBarItem);

@@ -165,6 +165,20 @@ Workflow `.github/workflows/release.yml` handles versioning, changelog, tag crea
 - **VSCodium** usually relies on **Open VSX**, not Microsoft Marketplace.
 - Publishing to both **VS Code Marketplace** and **Open VSX** maximizes compatibility and avoids manual duplication.
 
+### Local Open VSX Publishing Script
+
+If you want to manually publish a build to Open VSX from your local machine:
+
+```bash
+# Option A: With environment variable (Linux / Windows / macOS)
+export OVSX_PAT="your-token"
+npm run publish:ovsx:local
+
+# Option B: On macOS using Keychain (token is retrieved automatically)
+security add-generic-password -a "$USER" -s ovsx_pat -w
+npm run publish:ovsx:local
+```
+
 ---
 
 ## 🛠️ Development & Testing

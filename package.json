@@ -4,6 +4,7 @@
   "description": "Universal real-time RAM & process monitor for VS Code, Cursor, Windsurf, Devin, Trae and other forks. Shows memory in the status bar and detects duplicate extension versions.",
   "version": "1.0.0",
   "publisher": "SergioSuarezGil",
+  "icon": "assets/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -78,13 +79,15 @@
     "test:coverage": "npm run compile && node --test --experimental-test-coverage",
     "package": "npx @vscode/vsce package --no-yarn --skip-license",
     "changelog:generate": "conventional-changelog -p conventionalcommits -i CHANGELOG.md -s -r 0",
-    "publish:ovsx:local": "bash scripts/publish-ovsx-local.sh"
+    "publish:ovsx:local": "bash scripts/publish-ovsx-local.sh",
+    "publish:vscode:local": "bash scripts/publish-vscode-local.sh"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.9.2",
     "conventional-changelog": "^7.1.1",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
     "typescript": "^7.0.2"
   },
   "overrides": {
