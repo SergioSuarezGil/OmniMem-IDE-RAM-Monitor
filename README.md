@@ -4,7 +4,7 @@
 
 **Universal, lightweight real-time memory & process monitor for VS Code, Cursor, Windsurf, Antigravity IDE, Devin Desktop, Trae, VSCodium, and other forks.**
 
-[![Version](https://img.shields.io/visual-studio-marketplace/v/SergioSuarezGil.omnimem?label=version)](https://marketplace.visualstudio.com/items?itemName=SergioSuarezGil.omnimem)
+[![Version](https://vsmarketplacebadges.dev/version-short/SergioSuarezGil.omnimem.svg)](https://marketplace.visualstudio.com/items?itemName=SergioSuarezGil.omnimem)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20runtime-brightgreen.svg)]()
 [![Tested with Node](https://img.shields.io/badge/tests-node%3Atest-informational.svg)]()

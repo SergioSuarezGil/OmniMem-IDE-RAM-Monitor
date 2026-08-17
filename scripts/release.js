@@ -56,22 +56,22 @@ function captureGit(args) {
   return run("git", args, { capture: true }).trim();
 }
 
-function assertReleaseBranch() {
-  const branch = captureGit(["branch", "--show-current"]);
+function assertReleaseBranch(capture = captureGit) {
+  const branch = capture(["branch", "--show-current"]);
   if (branch !== "develop") {
     throw new Error(`Releases must be prepared from develop (current branch: ${branch || "detached HEAD"}).`);
   }
 }
 
-function assertCleanWorkingTree() {
-  if (captureGit(["status", "--porcelain"])) {
+function assertCleanWorkingTree(capture = captureGit) {
+  if (capture(["status", "--porcelain"])) {
     throw new Error("The working tree is not clean. Commit or stash your changes before preparing a release.");
   }
 }
 
-function updateRemoteMain() {
-  run("git", ["fetch", "origin", "main", "--quiet"]);
-  const result = spawnSync("git", ["merge-base", "--is-ancestor", "origin/main", "HEAD"], {
+function updateRemoteMain(execute = run, spawn = spawnSync) {
+  execute("git", ["fetch", "origin", "main", "--quiet"]);
+  const result = spawn("git", ["merge-base", "--is-ancestor", "origin/main", "HEAD"], {
     cwd: process.cwd(),
     stdio: "inherit",
   });
@@ -81,17 +81,17 @@ function updateRemoteMain() {
   }
 }
 
-function getLatestVersionTag() {
+function getLatestVersionTag(capture = captureGit) {
   try {
-    return captureGit(["describe", "--tags", "--abbrev=0", "--match", "v[0-9]*"]);
+    return capture(["describe", "--tags", "--abbrev=0", "--match", "v[0-9]*"]);
   } catch {
     return null;
   }
 }
 
-function getCommitMessagesSince(tag) {
+function getCommitMessagesSince(tag, capture = captureGit) {
   const range = tag ? `${tag}..HEAD` : "HEAD";
-  const output = captureGit(["log", range, "--format=%B%x1e"]);
+  const output = capture(["log", range, "--format=%B%x1e"]);
   return output ? output.split("\x1e").map((message) => message.trim()).filter(Boolean) : [];
 }
 
@@ -117,31 +117,44 @@ function resolveReleaseType(messages, requestedType) {
   return requestedType;
 }
 
-function prepareRelease(requestedType = "auto") {
-  assertReleaseBranch();
-  assertCleanWorkingTree();
-  updateRemoteMain();
+function prepareRelease(requestedType = "auto", dependencies = {}) {
+  const {
+    assertBranch = assertReleaseBranch,
+    assertClean = assertCleanWorkingTree,
+    updateMain = updateRemoteMain,
+    readLatestTag = getLatestVersionTag,
+    readMessages = getCommitMessagesSince,
+    resolveType = resolveReleaseType,
+    execute = run,
+    platform = process.platform,
+    readVersion = () => require(`${process.cwd()}/package.json`).version,
+    logger = console,
+  } = dependencies;
 
-  const latestTag = getLatestVersionTag();
-  const messages = getCommitMessagesSince(latestTag);
-  const releaseType = resolveReleaseType(messages, requestedType);
+  assertBranch();
+  assertClean();
+  updateMain();
+
+  const latestTag = readLatestTag();
+  const messages = readMessages(latestTag);
+  const releaseType = resolveType(messages, requestedType);
 
   if (!releaseType) {
-    console.log(`No publishable changes found since ${latestTag ?? "the beginning of the repository"}.`);
+    logger.log(`No publishable changes found since ${latestTag ?? "the beginning of the repository"}.`);
     return;
   }
 
-  console.log(`Preparing a ${releaseType} release from ${messages.length} commit(s)...`);
-  const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-  run(npmCommand, ["test"]);
-  run(npmCommand, ["run", "package"]);
-  run(npmCommand, ["version", releaseType, "--no-git-tag-version"]);
-  run(npmCommand, ["run", "changelog:generate"]);
+  logger.log(`Preparing a ${releaseType} release from ${messages.length} commit(s)...`);
+  const npmCommand = platform === "win32" ? "npm.cmd" : "npm";
+  execute(npmCommand, ["test"]);
+  execute(npmCommand, ["run", "package"]);
+  execute(npmCommand, ["version", releaseType, "--no-git-tag-version"]);
+  execute(npmCommand, ["run", "changelog:generate"]);
 
-  const version = require(`${process.cwd()}/package.json`).version;
-  console.log(`\nRelease v${version} is prepared locally.`);
-  console.log("Review package.json, package-lock.json, and CHANGELOG.md before committing.");
-  console.log("No commit, tag, push, merge, or publication was performed.");
+  const version = readVersion();
+  logger.log(`\nRelease v${version} is prepared locally.`);
+  logger.log("Review package.json, package-lock.json, and CHANGELOG.md before committing.");
+  logger.log("No commit, tag, push, merge, or publication was performed.");
 }
 
 if (require.main === module) {
@@ -154,7 +167,15 @@ if (require.main === module) {
 }
 
 module.exports = {
+  run,
+  captureGit,
+  assertReleaseBranch,
+  assertCleanWorkingTree,
+  updateRemoteMain,
+  getLatestVersionTag,
+  getCommitMessagesSince,
   classifyCommit,
   determineReleaseType,
   resolveReleaseType,
+  prepareRelease,
 };

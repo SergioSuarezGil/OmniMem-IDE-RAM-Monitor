@@ -29,9 +29,12 @@ export const getConfiguredDisplayFormat = (): DisplayFormat => {
   return config.get<DisplayFormat>('displayFormat') ?? 'used/total';
 };
 
-export const refreshStatusBar = async (statusBarItem: vscode.StatusBarItem): Promise<void> => {
+export const refreshStatusBar = async (
+  statusBarItem: vscode.StatusBarItem,
+  readMemoryUsage: typeof getEditorMemoryUsage = getEditorMemoryUsage
+): Promise<void> => {
   try {
-    const { usedKb, processCount, systemTotalBytes } = await getEditorMemoryUsage();
+    const { usedKb, processCount, systemTotalBytes } = await readMemoryUsage();
     const displayFormat = getConfiguredDisplayFormat();
     statusBarItem.text = `$(pulse) ${formatMemoryStatus(usedKb, systemTotalBytes, displayFormat)}`;
     statusBarItem.tooltip = `This editor (${processCount} process(es)) vs. total system RAM. Click to refresh.`;
