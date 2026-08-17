@@ -183,6 +183,10 @@ npm run publish:ovsx:local
 
 ## 🛠️ Development & Testing
 
+### Prerequisites
+
+- Node.js 20 or later. If you use `nvm`, run `nvm use` from the repository root.
+
 ```bash
 # Install dependencies
 npm install

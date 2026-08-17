@@ -11,6 +11,7 @@
     "url": "https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor"
   },
   "engines": {
+    "node": ">=20",
     "vscode": "^1.85.0"
   },
   "categories": [
@@ -88,6 +89,7 @@
     "@vscode/vsce": "^3.9.2",
     "conventional-changelog": "^7.1.1",
     "conventional-changelog-conventionalcommits": "^9.3.1",
+    "ovsx": "1.1.1",
     "typescript": "^7.0.2"
   },
   "overrides": {
