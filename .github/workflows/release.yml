@@ -17,6 +17,8 @@ jobs:
   release-and-publish:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    env:
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
 
     steps:
       - name: Checkout
@@ -117,7 +119,5 @@ jobs:
         run: npx @vscode/vsce publish --no-yarn --skip-license --pat "$VSCE_PAT"
 
       - name: Publish to Open VSX (optional)
-        if: ${{ secrets.OVSX_PAT != '' }}
-        env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        if: ${{ env.OVSX_PAT != '' }}
         run: npx ovsx publish "${{ steps.vsix.outputs.file }}" -p "$OVSX_PAT"
