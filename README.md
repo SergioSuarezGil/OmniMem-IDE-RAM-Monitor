@@ -2,7 +2,7 @@
 
 # ⚡ OmniMem – IDE RAM Monitor
 
-**Universal, lightweight real-time memory & process monitor for VS Code, Cursor, Windsurf, Devin Desktop, Trae, VSCodium, and other forks.**
+**Universal, lightweight real-time memory & process monitor for VS Code, Cursor, Windsurf, Antigravity IDE, Devin Desktop, Trae, VSCodium, and other forks.**
 
 [![Version](https://img.shields.io/visual-studio-marketplace/v/SergioSuarezGil.omnimem?label=version)](https://marketplace.visualstudio.com/items?itemName=SergioSuarezGil.omnimem)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -20,7 +20,7 @@
 
 **OmniMem** displays the real RAM usage of your editor runtime (Main process, Renderers, GPU, Extension Host, and Helpers) directly in your status bar. It also scans your installed extensions folder to find duplicate versions lingering on disk.
 
-Unlike existing memory monitors that hardcode binary names (breaking as soon as you switch to **Cursor**, **Windsurf**, or **Devin**), **OmniMem** is designed from the ground up to be **100% fork-agnostic**.
+Unlike existing memory monitors that hardcode binary names (breaking as soon as you switch to **Cursor**, **Windsurf**, **Antigravity IDE**, or **Devin**), **OmniMem** is designed from the ground up to be **100% fork-agnostic**.
 
 ---
 
@@ -53,6 +53,7 @@ Works seamlessly across all modern Electron / VS Code-based editors:
 | **Visual Studio Code** | macOS / Linux / Windows | Full Support |
 | **Cursor**             | macOS / Linux / Windows | Full Support |
 | **Windsurf**           | macOS / Linux / Windows | Full Support |
+| **Antigravity IDE**    | macOS / Linux / Windows | Full Support |
 | **Devin Desktop**      | macOS / Linux / Windows | Full Support |
 | **Trae**               | macOS / Linux / Windows | Full Support |
 | **VSCodium**           | macOS / Linux / Windows | Full Support |
@@ -125,6 +126,9 @@ cursor --install-extension omnimem-x.y.z.vsix
 # Windsurf
 windsurf --install-extension omnimem-x.y.z.vsix
 
+# Antigravity IDE
+antigravity-ide --install-extension omnimem-x.y.z.vsix
+
 # Devin Desktop
 devin-desktop --install-extension omnimem-x.y.z.vsix
 ```
@@ -158,7 +162,7 @@ After reviewing and committing the generated files, push `develop` and merge it 
 
 ### About VS Code Marketplace vs other editors
 
-- **VS Code / Cursor / Windsurf / Devin / Trae**: many forks can install VSIX directly, and some also consume Marketplace-compatible sources.
+- **VS Code / Cursor / Windsurf / Antigravity IDE / Devin / Trae**: many forks can install VSIX directly, and some also consume Marketplace-compatible sources.
 - **VSCodium** usually relies on **Open VSX**, not Microsoft Marketplace.
 - Publishing to both **VS Code Marketplace** and **Open VSX** maximizes compatibility and avoids manual duplication.
 
