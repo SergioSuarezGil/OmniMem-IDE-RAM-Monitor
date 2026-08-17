@@ -2,7 +2,7 @@
   "name": "omnimem",
   "displayName": "OmniMem – IDE RAM Monitor",
   "description": "Universal real-time RAM & process monitor for VS Code, Cursor, Windsurf, Antigravity IDE, Devin, Trae and other forks. Shows memory in the status bar and detects duplicate extension versions.",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "publisher": "SergioSuarezGil",
   "icon": "assets/icon.png",
   "license": "MIT",

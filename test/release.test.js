@@ -13,6 +13,7 @@ const {
   classifyCommit,
   determineReleaseType,
   resolveReleaseType,
+  updateReadmeVersionBadge,
   prepareRelease,
 } = require("../scripts/release");
 
@@ -92,6 +93,22 @@ test("version tag and commit readers handle repositories with and without tags",
   assert.deepEqual(getCommitMessagesSince(null, () => ""), []);
 });
 
+test("updateReadmeVersionBadge writes a cache-safe badge for the prepared version", () => {
+  const source = "[![Version](https://vsmarketplacebadges.dev/version-short/SergioSuarezGil.omnimem.svg)](https://marketplace.visualstudio.com/items?itemName=SergioSuarezGil.omnimem)";
+  let written;
+
+  updateReadmeVersionBadge("1.0.5", () => source, (_path, contents, encoding) => {
+    assert.equal(encoding, "utf8");
+    written = contents;
+  }, "README.md");
+
+  assert.match(written, /VS%20Marketplace-v1\.0\.5-007ACC/);
+  assert.throws(
+    () => updateReadmeVersionBadge("1.0.5", () => "no badge", () => {}, "README.md"),
+    /expected Marketplace version badge/
+  );
+});
+
 test("prepareRelease exits cleanly when there are no publishable commits", () => {
   const logs = [];
   let executed = false;
@@ -113,6 +130,7 @@ test("prepareRelease validates, packages, versions, and documents a release", ()
   const lifecycle = [];
   const commands = [];
   const logs = [];
+  const badges = [];
   prepareRelease("minor", {
     assertBranch: () => lifecycle.push("branch"),
     assertClean: () => lifecycle.push("clean"),
@@ -130,6 +148,7 @@ test("prepareRelease validates, packages, versions, and documents a release", ()
     execute: (command, args) => commands.push([command, args]),
     platform: "win32",
     readVersion: () => "1.1.0",
+    updateBadge: (version) => badges.push(version),
     logger: { log: (line) => logs.push(line) },
   });
 
@@ -140,5 +159,6 @@ test("prepareRelease validates, packages, versions, and documents a release", ()
     ["npm.cmd", ["version", "minor", "--no-git-tag-version"]],
     ["npm.cmd", ["run", "changelog:generate"]],
   ]);
+  assert.deepEqual(badges, ["1.1.0"]);
   assert.ok(logs.some((line) => /Release v1\.1\.0 is prepared locally/.test(line)));
 });
