@@ -19,6 +19,12 @@ test('getMacAppBundleRoot extracts the bundle root without depending on the edit
   assert.equal(getMacAppBundleRoot(execPath), '/Applications/Devin.app');
 });
 
+test('getMacAppBundleRoot supports Antigravity IDE helper processes', () => {
+  const execPath =
+    '/Applications/Antigravity IDE.app/Contents/Frameworks/Antigravity IDE Helper (Renderer).app/Contents/MacOS/Antigravity IDE Helper (Renderer)';
+  assert.equal(getMacAppBundleRoot(execPath), '/Applications/Antigravity IDE.app');
+});
+
 test('getMacAppBundleRoot returns null if there is no .app bundle', () => {
   assert.equal(getMacAppBundleRoot('/usr/local/bin/code'), null);
 });

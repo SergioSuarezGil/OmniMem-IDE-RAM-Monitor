@@ -24,7 +24,8 @@ const EXTENSION_FOLDER_PATTERN =
  * On macOS, Electron ships helper processes (Renderer/GPU/Plugin) as separate
  * ".app" bundles nested inside the main app bundle. Every process that
  * belongs to this editor instance - whatever fork it is (VS Code, Cursor,
- * Windsurf, Devin Desktop, Trae, VSCodium...) - lives under the FIRST ".app"
+ * Windsurf, Antigravity IDE, Devin Desktop, Trae, VSCodium...) - lives under
+ * the FIRST ".app"
  * segment of the extension host's own execPath. Extracting that root lets us
  * group all related processes without hardcoding any product name.
  *

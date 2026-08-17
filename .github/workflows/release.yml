@@ -46,7 +46,7 @@ jobs:
 
           if ! grep -Fq "## [$VERSION]" CHANGELOG.md; then
             echo "CHANGELOG.md has no release section for version $VERSION."
-            echo "Prepare the version and changelog in the pull request before merging it into main."
+            echo "Prepare the version and changelog before promoting develop to main."
             exit 1
           fi
 

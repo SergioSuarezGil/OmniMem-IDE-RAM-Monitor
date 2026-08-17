@@ -1,8 +1,8 @@
 {
   "name": "omnimem",
   "displayName": "OmniMem – IDE RAM Monitor",
-  "description": "Universal real-time RAM & process monitor for VS Code, Cursor, Windsurf, Devin, Trae and other forks. Shows memory in the status bar and detects duplicate extension versions.",
-  "version": "1.0.2",
+  "description": "Universal real-time RAM & process monitor for VS Code, Cursor, Windsurf, Antigravity IDE, Devin, Trae and other forks. Shows memory in the status bar and detects duplicate extension versions.",
+  "version": "1.0.3",
   "publisher": "SergioSuarezGil",
   "icon": "assets/icon.png",
   "license": "MIT",
@@ -15,18 +15,40 @@
     "vscode": "^1.85.0"
   },
   "categories": [
+    "Visualization",
     "Other"
   ],
   "keywords": [
     "memory",
     "ram",
+    "memory usage",
+    "ram usage",
     "monitor",
+    "ram monitor",
+    "resource monitor",
+    "system monitor",
+    "process monitor",
+    "process memory",
+    "task manager",
+    "rss",
+    "working set",
+    "real-time",
+    "lightweight",
+    "performance",
+    "status bar",
+    "vscode",
+    "visual studio code",
     "cursor",
     "windsurf",
+    "antigravity",
+    "antigravity ide",
     "devin",
     "trae",
-    "performance",
-    "status bar"
+    "vscodium",
+    "electron",
+    "extension host",
+    "duplicate extensions",
+    "open vsx"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -79,6 +101,7 @@
     "test": "npm run compile && node --test",
     "test:coverage": "npm run compile && node --test --experimental-test-coverage",
     "package": "npx @vscode/vsce package --no-yarn --skip-license",
+    "release": "node scripts/release.js",
     "changelog:generate": "conventional-changelog -p conventionalcommits -i CHANGELOG.md -s -r 0",
     "publish:ovsx:local": "bash scripts/publish-ovsx-local.sh",
     "publish:vscode:local": "bash scripts/publish-vscode-local.sh"
