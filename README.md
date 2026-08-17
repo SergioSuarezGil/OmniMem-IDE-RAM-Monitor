@@ -124,26 +124,37 @@ devin-desktop --install-extension omnimem-1.0.0.vsix
 
 ## 🚀 Release Process
 
-This repository is configured to create a GitHub Release and upload the `.vsix` automatically when you push a semantic version tag.
+This repository is configured to auto-publish on every push to `main`:
 
-### Create a new release
+- Bumps patch version automatically (`X.Y.Z` -> `X.Y.(Z+1)`).
+- Generates `CHANGELOG.md` from Conventional Commits.
+- Creates a GitHub Release with typed release notes.
+- Builds and attaches the `.vsix` asset.
+- Publishes to VS Code Marketplace.
+- Optionally publishes to Open VSX (recommended for VSCodium and compatible forks).
+
+### Required repository secrets
+
+- `VSCE_PAT`: Personal Access Token for VS Code Marketplace publishing.
+- `OVSX_PAT` (optional): Personal Access Token for Open VSX publishing.
+
+### Main branch release flow
 
 ```bash
-# Ensure you are up to date
+# Every push to main triggers release+publish automatically
 git checkout main
 git pull origin main
-
-# Update version in package.json if needed, then commit
-git add package.json package-lock.json
-git commit -m "chore: bump version to 1.0.1"
+git merge <your-branch>
 git push origin main
-
-# Create and push the tag
-git tag v1.0.1
-git push origin v1.0.1
 ```
 
-Once the tag is pushed, workflow `.github/workflows/release.yml` builds the extension and publishes the `.vsix` in Releases.
+Workflow `.github/workflows/release.yml` handles versioning, changelog, tag creation, release generation, and publishing.
+
+### About VS Code Marketplace vs other editors
+
+- **VS Code / Cursor / Windsurf / Devin / Trae**: many forks can install VSIX directly, and some also consume Marketplace-compatible sources.
+- **VSCodium** usually relies on **Open VSX**, not Microsoft Marketplace.
+- Publishing to both **VS Code Marketplace** and **Open VSX** maximizes compatibility and avoids manual duplication.
 
 ---
 

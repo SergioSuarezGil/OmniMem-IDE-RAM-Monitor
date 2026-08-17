@@ -75,12 +75,14 @@
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node --test",
     "test:coverage": "npm run compile && node --test --experimental-test-coverage",
-    "package": "npx @vscode/vsce package --no-yarn --skip-license -o omnimem-1.0.0.vsix"
+    "package": "npx @vscode/vsce package --no-yarn --skip-license",
+    "changelog:generate": "conventional-changelog -p conventionalcommits -i CHANGELOG.md -s -r 0"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.9.2",
+    "conventional-changelog": "^7.1.1",
     "typescript": "^7.0.2"
   },
   "overrides": {

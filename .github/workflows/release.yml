@@ -1,21 +1,28 @@
-name: Release VSIX
+name: Release and Publish Extension
 
 on:
   push:
-    tags:
-      - "v*.*.*"
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
 jobs:
-  build-and-release:
+  release-and-publish:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -26,8 +33,51 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Compile
-        run: npm run compile
+      - name: Validate publisher and required secrets
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          PUBLISHER=$(node -p "require('./package.json').publisher")
+          if [ "$PUBLISHER" = "local" ]; then
+            echo "package.json publisher is 'local'. Set your real VS Marketplace publisher id before publishing."
+            exit 1
+          fi
+
+          if [ -z "$VSCE_PAT" ]; then
+            echo "Missing VSCE_PAT secret in repository settings."
+            exit 1
+          fi
+
+      - name: Run tests
+        run: npm test
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump patch version
+        id: version
+        run: |
+          npm version patch --no-git-tag-version
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog from conventional commits
+        run: npm run changelog:generate
+
+      - name: Commit version and changelog
+        run: |
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "chore(release): ${{ steps.version.outputs.tag }} [skip ci]"
+          git tag "${{ steps.version.outputs.tag }}"
+
+      - name: Push commit and tag
+        run: |
+          git push origin main
+          git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Package VSIX
         run: npx @vscode/vsce package --no-yarn --skip-license
@@ -38,8 +88,36 @@ jobs:
           VSIX_FILE=$(ls -1 *.vsix | head -n 1)
           echo "file=$VSIX_FILE" >> "$GITHUB_OUTPUT"
 
+      - name: Build release notes from changelog section
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          awk -v ver="$VERSION" '
+            BEGIN {capture=0}
+            $0 ~ "^## \\[" ver "\\]" {capture=1; print; next}
+            $0 ~ "^## \\[" && capture==1 {exit}
+            capture==1 {print}
+          ' CHANGELOG.md > RELEASE_NOTES.md
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "## ${{ steps.version.outputs.tag }}" > RELEASE_NOTES.md
+            echo "Automated release." >> RELEASE_NOTES.md
+          fi
+
       - name: Create GitHub Release and upload VSIX
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body_path: RELEASE_NOTES.md
           files: ${{ steps.vsix.outputs.file }}
-          generate_release_notes: true
+
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx @vscode/vsce publish --no-yarn --skip-license --pat "$VSCE_PAT"
+
+      - name: Publish to Open VSX (optional)
+        if: ${{ secrets.OVSX_PAT != '' }}
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: npx ovsx publish "${{ steps.vsix.outputs.file }}" -p "$OVSX_PAT"
