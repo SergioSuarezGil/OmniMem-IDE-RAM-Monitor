@@ -3,6 +3,7 @@
 .nvmrc
 .vscode/**
 .vscodeignore
+assets/omnimem-social-*.png
 coverage/**
 node_modules/**
 scripts/**

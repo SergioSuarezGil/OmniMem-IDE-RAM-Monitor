@@ -18,20 +18,27 @@ export const runCommand = (command: string): Promise<string> =>
     );
   });
 
-export const getProcessSnapshot = async (): Promise<ProcessSnapshot> => {
-  if (process.platform === 'win32') {
-    const raw = await runCommand(WINDOWS_PROCESS_SNAPSHOT_COMMAND);
+export const getProcessSnapshot = async (
+  execute: (command: string) => Promise<string> = runCommand,
+  platform: NodeJS.Platform = process.platform
+): Promise<ProcessSnapshot> => {
+  if (platform === 'win32') {
+    const raw = await execute(WINDOWS_PROCESS_SNAPSHOT_COMMAND);
     return { platform: 'win32', raw };
   }
-  const raw = await runCommand(UNIX_PROCESS_SNAPSHOT_COMMAND);
-  return { platform: process.platform, raw };
+  const raw = await execute(UNIX_PROCESS_SNAPSHOT_COMMAND);
+  return { platform, raw };
 };
 
-export const getEditorMemoryUsage = async (): Promise<EditorMemoryUsage> => {
-  const snapshot = await getProcessSnapshot();
+export const getEditorMemoryUsage = async (
+  readSnapshot: () => Promise<ProcessSnapshot> = getProcessSnapshot,
+  execPath: string = process.execPath,
+  totalMemory: () => number = os.totalmem
+): Promise<EditorMemoryUsage> => {
+  const snapshot = await readSnapshot();
   const { totalKb, matched, parseError } = summarizeProcessSnapshot(
     snapshot.platform,
-    process.execPath,
+    execPath,
     snapshot.raw
   );
   if (parseError) throw new Error('could not parse the process snapshot (invalid JSON from PowerShell)');
@@ -39,6 +46,6 @@ export const getEditorMemoryUsage = async (): Promise<EditorMemoryUsage> => {
   return {
     usedKb: totalKb,
     processCount: matched,
-    systemTotalBytes: os.totalmem(),
+    systemTotalBytes: totalMemory(),
   };
 };

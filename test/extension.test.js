@@ -1,9 +1,11 @@
 'use strict';
 
-require('./setup');
+const { reset, state } = require('./setup');
 
-const { test } = require('node:test');
+const { afterEach, beforeEach, test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const {
   buildStatusBarItem,
@@ -16,21 +18,30 @@ const {
   deactivate,
 } = require('../out/extension');
 
+const temporaryDirectories = [];
+
+beforeEach(reset);
+afterEach(() => {
+  while (temporaryDirectories.length > 0) {
+    fs.rmSync(temporaryDirectories.pop(), { recursive: true, force: true });
+  }
+});
+
 test('buildStatusBarItem creates a right-aligned status bar item', () => {
   const item = buildStatusBarItem();
   assert.equal(item.command, 'memoryMonitor.refresh');
   assert.equal(item.alignment, 2); // Right
 });
 
-test('getConfiguredRefreshIntervalMs returns default when not set', () => {
-  const interval = getConfiguredRefreshIntervalMs();
-  assert.equal(typeof interval, 'number');
-  assert.ok(interval >= 1000);
-});
+test('configuration helpers return configured and default values', () => {
+  state.config.refreshIntervalMs = 2500;
+  state.config.displayFormat = 'compact';
+  assert.equal(getConfiguredRefreshIntervalMs(), 2500);
+  assert.equal(getConfiguredDisplayFormat(), 'compact');
 
-test('getConfiguredDisplayFormat returns configured format', () => {
-  const format = getConfiguredDisplayFormat();
-  assert.equal(typeof format, 'string');
+  state.config = {};
+  assert.equal(getConfiguredRefreshIntervalMs(), 5000);
+  assert.equal(getConfiguredDisplayFormat(), 'used/total');
 });
 
 test('listInstalledExtensionFolders returns subdirectories in a directory', () => {
@@ -52,20 +63,39 @@ test('reportDuplicateExtensions shows warning in development mode', () => {
     clear: () => {},
   };
   reportDuplicateExtensions(mockContext, mockChannel);
+  assert.equal(state.warnings.length, 1);
 });
 
-test('reportDuplicateExtensions scans extensions in production mode and reports duplicates or none', () => {
+test('reportDuplicateExtensions reports duplicate versions in production mode', () => {
+  const extensionsRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omnimem-extensions-'));
+  temporaryDirectories.push(extensionsRoot);
+  fs.mkdirSync(path.join(extensionsRoot, 'example.tool-1.0.0'));
+  fs.mkdirSync(path.join(extensionsRoot, 'example.tool-2.0.0'));
   const mockContext = {
     extensionMode: 2, // Production
-    extensionPath: path.resolve(__dirname, '..', 'node_modules', 'some-pkg'),
+    extensionPath: path.join(extensionsRoot, 'omnimem'),
   };
-  const logged = [];
   const mockChannel = {
-    appendLine: (line) => logged.push(line),
-    show: () => {},
-    clear: () => {},
+    lines: ['stale'],
+    appendLine(line) { this.lines.push(line); },
+    showCount: 0,
+    show() { this.showCount += 1; },
+    clear() { this.lines = []; },
   };
   reportDuplicateExtensions(mockContext, mockChannel);
+  assert.equal(mockChannel.showCount, 1);
+  assert.match(mockChannel.lines.join('\n'), /example\.tool: 1\.0\.0, 2\.0\.0/);
+});
+
+test('reportDuplicateExtensions reports when no duplicates exist', () => {
+  const extensionsRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omnimem-extensions-'));
+  temporaryDirectories.push(extensionsRoot);
+  fs.mkdirSync(path.join(extensionsRoot, 'example.tool-1.0.0'));
+  reportDuplicateExtensions(
+    { extensionMode: 2, extensionPath: path.join(extensionsRoot, 'omnimem') },
+    { appendLine() {}, show() {}, clear() {} }
+  );
+  assert.equal(state.information.length, 1);
 });
 
 test('reportDuplicateExtensions handles non-existent extension directory gracefully', () => {
@@ -79,13 +109,26 @@ test('reportDuplicateExtensions handles non-existent extension directory gracefu
     clear: () => {},
   };
   reportDuplicateExtensions(mockContext, mockChannel);
+  assert.equal(state.errors.length, 1);
+  assert.match(state.errors[0], /Could not read/);
 });
 
-test('refreshStatusBar updates status bar text and shows it', async () => {
+test('refreshStatusBar renders successful memory usage', async () => {
   const item = buildStatusBarItem();
-  await refreshStatusBar(item);
-  assert.ok(item.text.length > 0);
-  assert.ok(item.tooltip.length > 0);
+  await refreshStatusBar(item, async () => ({ usedKb: 2 * 1024 * 1024, processCount: 4, systemTotalBytes: 16 * 1024 ** 3 }));
+  assert.equal(item.text, '$(pulse) 2.0GB/16.0GB');
+  assert.match(item.tooltip, /4 process\(es\)/);
+  assert.equal(item.showCount, 1);
+});
+
+test('refreshStatusBar renders errors without throwing', async () => {
+  const item = buildStatusBarItem();
+  await refreshStatusBar(item, async () => { throw new Error('snapshot failed'); });
+  assert.equal(item.text, '$(warning) mem?');
+  assert.match(item.tooltip, /snapshot failed/);
+
+  await refreshStatusBar(item, async () => { throw 'unknown failure'; });
+  assert.match(item.tooltip, /unknown failure/);
 });
 
 test('activate registers commands, config listeners, and status bar', () => {
@@ -97,6 +140,17 @@ test('activate registers commands, config listeners, and status bar', () => {
     extensionPath: path.resolve(__dirname, '..'),
   };
   activate(mockContext);
+  assert.equal(state.configurationListeners.length, 1);
+  assert.ok(state.commands.has('memoryMonitor.refresh'));
+  assert.ok(state.commands.has('memoryMonitor.checkDuplicateExtensions'));
+
+  state.config.refreshIntervalMs = 3000;
+  state.configurationListeners[0]({
+    affectsConfiguration: (key) => key === 'memoryMonitor.refreshIntervalMs' || key === 'memoryMonitor.displayFormat',
+  });
+  state.commands.get('memoryMonitor.refresh')();
+  state.commands.get('memoryMonitor.checkDuplicateExtensions')();
+
   assert.ok(subscriptions.length > 0);
   subscriptions.forEach((s) => s && typeof s.dispose === 'function' && s.dispose());
   deactivate();
