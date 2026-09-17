@@ -108,14 +108,14 @@
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.138.0",
     "@vscode/vsce": "^3.9.2",
-    "conventional-changelog": "^7.1.1",
+    "conventional-changelog": "^7.2.1",
     "conventional-changelog-conventionalcommits": "^9.3.1",
     "ovsx": "1.1.1",
     "typescript": "^7.0.2"
   },
   "overrides": {
-    "undici": "^6.21.1"
+    "undici": "^7.29.1"
   }
 }
