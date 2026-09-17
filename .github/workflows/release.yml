@@ -176,6 +176,13 @@ jobs:
               exit 0
             fi
 
+            # A previous run may have published this immutable version before
+            # failing to create the GitHub release. Treat it as success.
+            if echo "$OUTPUT" | grep -qi "already exists"; then
+              echo "VS Code Marketplace already contains this version; continuing."
+              exit 0
+            fi
+
             if ! echo "$OUTPUT" | grep -q "TF10216"; then
               exit "$STATUS"
             fi
@@ -204,6 +211,13 @@ jobs:
             echo "$OUTPUT"
 
             if [ "$STATUS" -eq 0 ]; then
+              exit 0
+            fi
+
+            # A previous run may have published this immutable version before
+            # failing to create the GitHub release. Treat it as success.
+            if echo "$OUTPUT" | grep -Eqi "already (published|exists)"; then
+              echo "Open VSX already contains this version; continuing."
               exit 0
             fi
 
