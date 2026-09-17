@@ -1,3 +1,14 @@
+## [1.0.6](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.0.5...v1.0.6) (2026-09-17)
+
+### Security
+
+- update the pinned GitHub Release action to v3.0.3
+- force the patched undici 7.29.1 dependency in the release toolchain
+
+### Maintenance
+
+- update VS Code typings and changelog tooling
+
 ## [1.0.5](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.0.4...v1.0.5) (2026-08-18)
 
 ### Maintenance
