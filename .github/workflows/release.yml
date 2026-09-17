@@ -196,7 +196,29 @@ jobs:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
           VSIX_FILE=$(ls -1 *.vsix | head -n 1)
-          npx --no-install ovsx publish "$VSIX_FILE" -p "$OVSX_PAT"
+          for ATTEMPT in 1 2 3; do
+            set +e
+            OUTPUT=$(npx --no-install ovsx publish "$VSIX_FILE" -p "$OVSX_PAT" 2>&1)
+            STATUS=$?
+            set -e
+            echo "$OUTPUT"
+
+            if [ "$STATUS" -eq 0 ]; then
+              exit 0
+            fi
+
+            if ! echo "$OUTPUT" | grep -q "status 503"; then
+              exit "$STATUS"
+            fi
+
+            if [ "$ATTEMPT" -lt 3 ]; then
+              WAIT_SECONDS=$((ATTEMPT * 20))
+              echo "Open VSX is temporarily unavailable. Retrying in ${WAIT_SECONDS}s..."
+              sleep "$WAIT_SECONDS"
+            fi
+          done
+
+          exit 1
 
       - name: Verify marketplace publication results
         if: always()
