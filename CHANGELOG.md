@@ -1,3 +1,14 @@
+## [1.0.7](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.0.6...v1.0.7) (2026-11-10)
+
+### Bug Fixes
+
+* **ci:** pin release tags to push SHA and harden VSIX paths ([f276587](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/commit/f276587eb6205762ace6fe4b9e89a5f0030b8c8f))
+
+### Maintenance
+
+- bump GitHub Actions dependencies (upload-artifact, setup-node, download-artifact, action-gh-release)
+- sync develop with main before release preparation
+
 ## [1.0.6](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.0.5...v1.0.6) (2026-09-17)
 
 ### Security
