@@ -75,9 +75,12 @@ jobs:
         if: steps.version.outputs.should_publish == 'true'
         id: vsix
         run: |
-          VSIX_FILE=$(ls -1 *.vsix | head -n 1)
-          if [ -z "$VSIX_FILE" ]; then
-            echo "No VSIX package was generated."
+          VERSION="${{ steps.version.outputs.version }}"
+          VSIX_FILE="omnimem-${VERSION}.vsix"
+          COUNT=$(find . -maxdepth 1 -name '*.vsix' -type f | wc -l)
+          if [ "$COUNT" -ne 1 ] || [ ! -f "$VSIX_FILE" ]; then
+            echo "Expected exactly one VSIX named $VSIX_FILE (found $COUNT)."
+            ls -la *.vsix 2>/dev/null || true
             exit 1
           fi
           echo "file=$VSIX_FILE" >> "$GITHUB_OUTPUT"
@@ -164,7 +167,14 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
-          VSIX_FILE=$(ls -1 *.vsix | head -n 1)
+          VERSION="${{ needs.build-package.outputs.version }}"
+          VSIX_FILE="omnimem-${VERSION}.vsix"
+          COUNT=$(find . -maxdepth 1 -name '*.vsix' -type f | wc -l)
+          if [ "$COUNT" -ne 1 ] || [ ! -f "$VSIX_FILE" ]; then
+            echo "Expected exactly one VSIX named $VSIX_FILE (found $COUNT)."
+            ls -la *.vsix 2>/dev/null || true
+            exit 1
+          fi
           for ATTEMPT in 1 2 3; do
             set +e
             OUTPUT=$(npx @vscode/vsce publish --packagePath "$VSIX_FILE" --pat "$VSCE_PAT" 2>&1)
@@ -202,7 +212,14 @@ jobs:
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
-          VSIX_FILE=$(ls -1 *.vsix | head -n 1)
+          VERSION="${{ needs.build-package.outputs.version }}"
+          VSIX_FILE="omnimem-${VERSION}.vsix"
+          COUNT=$(find . -maxdepth 1 -name '*.vsix' -type f | wc -l)
+          if [ "$COUNT" -ne 1 ] || [ ! -f "$VSIX_FILE" ]; then
+            echo "Expected exactly one VSIX named $VSIX_FILE (found $COUNT)."
+            ls -la *.vsix 2>/dev/null || true
+            exit 1
+          fi
           for ATTEMPT in 1 2 3; do
             set +e
             OUTPUT=$(npx --no-install ovsx publish "$VSIX_FILE" -p "$OVSX_PAT" 2>&1)
@@ -272,9 +289,12 @@ jobs:
       - name: Detect VSIX file
         id: vsix
         run: |
-          VSIX_FILE=$(ls -1 *.vsix | head -n 1)
-          if [ -z "$VSIX_FILE" ]; then
-            echo "No VSIX package was downloaded."
+          VERSION="${{ needs.build-package.outputs.version }}"
+          VSIX_FILE="omnimem-${VERSION}.vsix"
+          COUNT=$(find . -maxdepth 1 -name '*.vsix' -type f | wc -l)
+          if [ "$COUNT" -ne 1 ] || [ ! -f "$VSIX_FILE" ]; then
+            echo "Expected exactly one VSIX named $VSIX_FILE (found $COUNT)."
+            ls -la *.vsix 2>/dev/null || true
             exit 1
           fi
           echo "file=$VSIX_FILE" >> "$GITHUB_OUTPUT"
@@ -284,5 +304,7 @@ jobs:
         with:
           tag_name: ${{ needs.build-package.outputs.tag }}
           name: ${{ needs.build-package.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           body_path: RELEASE_NOTES.md
           files: ${{ steps.vsix.outputs.file }}
+          fail_on_unmatched_files: true
