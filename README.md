@@ -139,10 +139,16 @@ devin-desktop --install-extension omnimem-x.y.z.vsix
 
 Development follows a lightweight Git Flow: feature branches are integrated into `develop`, releases are prepared locally, and only the maintainer promotes `develop` to `main`.
 
-### Required repository secrets
+### Required marketplace secrets
+
+`VSCE_PAT` and `OVSX_PAT` are configured as secrets on the GitHub Environment `marketplace-production` (used by the `publish-marketplaces` job), not as ordinary repository secrets alone:
 
 - `VSCE_PAT`: Personal Access Token for VS Code Marketplace publishing.
 - `OVSX_PAT`: Personal Access Token for Open VSX publishing.
+
+### Actor gate
+
+The release workflow publish path only runs when `github.actor == 'SergioSuarezGil'` (and the ref is `main`). Pushes or `workflow_dispatch` runs from any other actor are skipped by the job-level `if` condition.
 
 ### Preparing and publishing a release
 
@@ -158,7 +164,7 @@ npm run release -- minor
 
 The script verifies the branch history, runs tests, packages the extension, updates the version, and generates `CHANGELOG.md`. It does not commit, tag, push, merge, or publish anything.
 
-After reviewing and committing the generated files, push `develop` and merge it into `main`. A push to `main` runs `.github/workflows/release.yml`, which validates the prepared version, publishes to both marketplaces, and creates the tag and GitHub Release.
+After reviewing and committing the generated files, push `develop` and merge it into `main`. A push to `main` by the maintainer runs `.github/workflows/release.yml`, which validates the prepared version, publishes to both marketplaces, and creates the tag and GitHub Release (pinned to the committing SHA via `target_commitish`).
 
 ### About VS Code Marketplace vs other editors
 
