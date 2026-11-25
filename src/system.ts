@@ -9,7 +9,11 @@ import { ProcessSnapshot, EditorMemoryUsage } from './types';
 
 const MAX_PS_BUFFER_BYTES = 10 * 1024 * 1024;
 const PROCESS_COMMAND_TIMEOUT_MS = 10_000;
-/** Cap concurrent /proc reads so a stuck cmdline cannot saturate the shared libuv pool. */
+/**
+ * Cap concurrent /proc reads. Node's default libuv pool is 4 threads, so a batch
+ * of 8 can still saturate it if several cmdline reads block; this only reduces
+ * pressure versus scanning unbounded PIDs at once.
+ */
 export const PROC_READ_BATCH_SIZE = 8;
 const PROC_PID_PATTERN = /^\d+$/;
 const PROC_VM_RSS_PATTERN = /^VmRSS:[ \t]+(\d+)[ \t]+kB$/m;
@@ -90,6 +94,8 @@ const collectLinuxProcSnapshot = async (
           const status = await readFile(path.join(procRoot, pid, 'status'), 'utf8');
           const rssMatch = status.match(PROC_VM_RSS_PATTERN);
           if (!rssMatch) return null;
+          // Status may complete after the budget expired; do not open cmdline then.
+          if (signal?.aborted) return null;
 
           const cmdline = await readFile(path.join(procRoot, pid, 'cmdline'), 'utf8');
           const command = cmdline.replace(/[\0\r\n]/g, ' ').trimEnd();

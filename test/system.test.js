@@ -258,6 +258,32 @@ test('timed-out /proc walk does not open files for later batches', async () => {
   assert.equal(openedAfterTimeout, 0, 'must not schedule reads for later PID batches after timeout');
 });
 
+test('timed-out /proc walk does not open cmdline after a late status read', async () => {
+  let releaseStatus;
+  let cmdlineOpens = 0;
+
+  const readFile = async (filePath) => {
+    if (String(filePath).endsWith(`${path.sep}status`)) {
+      return new Promise((resolve) => {
+        releaseStatus = () => resolve('Name:\tp\nVmRSS:\t      10 kB\n');
+      });
+    }
+    cmdlineOpens += 1;
+    return '/bin/late';
+  };
+
+  await assert.rejects(
+    () => readLinuxProcSnapshot('/proc-fake', 50, readFile, async () => ['4242']),
+    /timed out/
+  );
+  assert.equal(typeof releaseStatus, 'function');
+  releaseStatus();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  assert.equal(cmdlineOpens, 0, 'must not open cmdline once the snapshot budget has expired');
+});
+
 test('getProcessSnapshot does not fall back to /proc after a ps timeout', async () => {
   const timeoutError = Object.assign(new Error('ps timed out'), {
     killed: true,
