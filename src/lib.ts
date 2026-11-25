@@ -1,8 +1,8 @@
 'use strict';
 
-import * as path from 'path';
 import {
   DisplayFormat,
+  ProcessMatchMode,
   ProcessSummary,
   ExtensionFolderInfo,
   DuplicateExtension,
@@ -17,6 +17,9 @@ const BYTES_PER_GB = 1024 ** 3;
 const GB_DECIMAL_PLACES = 1;
 const PS_HEADER_ROWS = 1;
 const PS_LINE_PATTERN = /^(\d+)\s+(\d+)\s+(.*)$/;
+// After a prefix match, the next character must be a path/arg boundary so
+// "/Applications/Windsurf.app.backup/..." does not match "/Applications/Windsurf.app".
+const PREFIX_BOUNDARY_PATTERN = /^(?:[/\s]|$)/;
 const EXTENSION_FOLDER_PATTERN =
   /^(.+)-(\d+\.\d+\.\d+(?:-[\w.]+)?)(?:-(?:darwin|linux|win32|alpine)-[\w]+|-universal|-web)?$/;
 
@@ -43,12 +46,21 @@ export const getMacAppBundleRoot = (execPath: string): string | null => {
 
 /**
  * Parses `ps -eo pid,rss,command` output (RSS in KB) and sums the RSS of the
- * lines whose command contains `matchSubstring`.
+ * lines whose command matches `matchSubstring`.
+ *
+ * `matchMode` controls how the command line is compared:
+ *  - 'prefix': the command must START with `matchSubstring` (argv[0] check).
+ *    This avoids counting unrelated processes that merely mention the path
+ *    as an argument (e.g. `vim /Applications/Windsurf.app/notes.txt`).
+ *    A target ending in '/' matches commands inside that directory.
+ *  - 'substring': the command must CONTAIN `matchSubstring` anywhere.
  */
 export const sumRssForMatchingProcesses = (
   psOutput: string,
-  matchSubstring: string
+  matchSubstring: string,
+  matchMode: ProcessMatchMode = 'substring'
 ): ProcessSummary => {
+  const isDirectoryPrefix = matchSubstring.endsWith('/');
   const dataLines = psOutput.split('\n').slice(PS_HEADER_ROWS);
   return dataLines.reduce<ProcessSummary>(
     (totals, line) => {
@@ -57,7 +69,12 @@ export const sumRssForMatchingProcesses = (
       const match = trimmedLine.match(PS_LINE_PATTERN);
       if (!match) return totals;
       const [, , rssKbText, command] = match;
-      if (!command.includes(matchSubstring)) return totals;
+      const matches =
+        matchMode === 'prefix'
+          ? command.startsWith(matchSubstring) &&
+            (isDirectoryPrefix || PREFIX_BOUNDARY_PATTERN.test(command.slice(matchSubstring.length)))
+          : command.includes(matchSubstring);
+      if (!matches) return totals;
       return { totalKb: totals.totalKb + parseInt(rssKbText, 10), matched: totals.matched + 1 };
     },
     { totalKb: 0, matched: 0 }
@@ -199,8 +216,8 @@ export const summarizeProcessSnapshot = (
 ): ProcessSummary => {
   if (platform === 'win32') return sumRssForMatchingProcessesWindows(rawSnapshot, execPath);
   if (platform === 'darwin') {
-    const bundleRoot = getMacAppBundleRoot(execPath) ?? path.dirname(execPath);
-    return sumRssForMatchingProcesses(rawSnapshot, bundleRoot);
+    const bundleRoot = getMacAppBundleRoot(execPath);
+    if (bundleRoot) return sumRssForMatchingProcesses(rawSnapshot, `${bundleRoot}/`, 'prefix');
   }
-  return sumRssForMatchingProcesses(rawSnapshot, execPath);
+  return sumRssForMatchingProcesses(rawSnapshot, execPath, 'prefix');
 };

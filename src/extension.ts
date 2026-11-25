@@ -8,6 +8,8 @@ import { getEditorMemoryUsage } from './system';
 import { DisplayFormat } from './types';
 
 const DEFAULT_REFRESH_INTERVAL_MS = 5000;
+const MIN_REFRESH_INTERVAL_MS = 1000;
+const MAX_REFRESH_INTERVAL_MS = 2 ** 31 - 1;
 const STATUS_BAR_PRIORITY = 100;
 
 export const buildStatusBarItem = (): vscode.StatusBarItem => {
@@ -21,7 +23,14 @@ export const buildStatusBarItem = (): vscode.StatusBarItem => {
 
 export const getConfiguredRefreshIntervalMs = (): number => {
   const config = vscode.workspace.getConfiguration('memoryMonitor');
-  return config.get<number>('refreshIntervalMs') ?? DEFAULT_REFRESH_INTERVAL_MS;
+  const configured = config.get<number>('refreshIntervalMs');
+  const interval =
+    typeof configured === 'number' &&
+    Number.isFinite(configured) &&
+    configured <= MAX_REFRESH_INTERVAL_MS
+      ? configured
+      : DEFAULT_REFRESH_INTERVAL_MS;
+  return Math.max(MIN_REFRESH_INTERVAL_MS, interval);
 };
 
 export const getConfiguredDisplayFormat = (): DisplayFormat => {
@@ -37,7 +46,8 @@ export const refreshStatusBar = async (
     const { usedKb, processCount, systemTotalBytes } = await readMemoryUsage();
     const displayFormat = getConfiguredDisplayFormat();
     statusBarItem.text = `$(pulse) ${formatMemoryStatus(usedKb, systemTotalBytes, displayFormat)}`;
-    statusBarItem.tooltip = `This editor (${processCount} process(es)) vs. total system RAM. Click to refresh.`;
+    statusBarItem.tooltip = `Summed RSS/working set for this editor (${processCount} process(es)) vs. total system RAM. ` +
+      'Shared pages may be counted more than once. Click to refresh.';
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     statusBarItem.text = '$(warning) mem?';
@@ -91,7 +101,19 @@ export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel('OmniMem');
   context.subscriptions.push(statusBarItem, outputChannel);
 
-  const refresh = () => refreshStatusBar(statusBarItem);
+  // Skip refreshes while one is still running: `ps`/PowerShell can take
+  // longer than the interval on a loaded system, and overlapping execs are
+  // wasted work.
+  let refreshInFlight = false;
+  const refresh = async (): Promise<void> => {
+    if (refreshInFlight) return;
+    refreshInFlight = true;
+    try {
+      await refreshStatusBar(statusBarItem);
+    } finally {
+      refreshInFlight = false;
+    }
+  };
 
   let timer: NodeJS.Timeout = setInterval(refresh, getConfiguredRefreshIntervalMs());
   context.subscriptions.push({ dispose: () => clearInterval(timer) });

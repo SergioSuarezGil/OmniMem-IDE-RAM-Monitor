@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { runCommand } = require('../out/system');
 const {
   buildStatusBarItem,
   getConfiguredRefreshIntervalMs,
@@ -42,6 +43,28 @@ test('configuration helpers return configured and default values', () => {
   state.config = {};
   assert.equal(getConfiguredRefreshIntervalMs(), 5000);
   assert.equal(getConfiguredDisplayFormat(), 'used/total');
+});
+
+test('getConfiguredRefreshIntervalMs clamps short delays and uses the default for non-numeric values', () => {
+  state.config.refreshIntervalMs = 0;
+  assert.equal(getConfiguredRefreshIntervalMs(), 1000);
+
+  state.config.refreshIntervalMs = -500;
+  assert.equal(getConfiguredRefreshIntervalMs(), 1000);
+
+  state.config.refreshIntervalMs = 'fast';
+  assert.equal(getConfiguredRefreshIntervalMs(), 5000);
+
+  state.config.refreshIntervalMs = 250;
+  assert.equal(getConfiguredRefreshIntervalMs(), 1000);
+
+  state.config.refreshIntervalMs = 10000;
+  assert.equal(getConfiguredRefreshIntervalMs(), 10000);
+});
+
+test('getConfiguredRefreshIntervalMs rejects delays that overflow Node timers', () => {
+  state.config.refreshIntervalMs = 2 ** 31;
+  assert.equal(getConfiguredRefreshIntervalMs(), 5000);
 });
 
 test('listInstalledExtensionFolders returns subdirectories in a directory', () => {
@@ -121,6 +144,14 @@ test('refreshStatusBar renders successful memory usage', async () => {
   assert.equal(item.showCount, 1);
 });
 
+test('refreshStatusBar explains that summed process memory can include shared pages', async () => {
+  const item = buildStatusBarItem();
+  await refreshStatusBar(item, async () => ({ usedKb: 1024, processCount: 2, systemTotalBytes: 1024 ** 3 }));
+
+  assert.match(item.tooltip, /RSS\/working set/);
+  assert.match(item.tooltip, /Shared pages may be counted more than once/);
+});
+
 test('refreshStatusBar renders errors without throwing', async () => {
   const item = buildStatusBarItem();
   await refreshStatusBar(item, async () => { throw new Error('snapshot failed'); });
@@ -129,6 +160,22 @@ test('refreshStatusBar renders errors without throwing', async () => {
 
   await refreshStatusBar(item, async () => { throw 'unknown failure'; });
   assert.match(item.tooltip, /unknown failure/);
+});
+
+test('refreshStatusBar recovers after a snapshot command times out', { timeout: 5000 }, async () => {
+  const item = buildStatusBarItem();
+  let commandError;
+  await refreshStatusBar(item, () =>
+    runCommand(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], 100).catch((error) => {
+      commandError = error;
+      throw error;
+    })
+  );
+  assert.equal(commandError?.killed, true);
+  assert.equal(item.text, '$(warning) mem?');
+
+  await refreshStatusBar(item, async () => ({ usedKb: 1024 ** 2, processCount: 1, systemTotalBytes: 8 * 1024 ** 3 }));
+  assert.equal(item.text, '$(pulse) 1.0GB/8.0GB');
 });
 
 test('activate registers commands, config listeners, and status bar', () => {

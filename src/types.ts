@@ -2,6 +2,8 @@
 
 export type DisplayFormat = 'used/total' | 'usedOnly' | 'percentage' | 'compact';
 
+export type ProcessMatchMode = 'prefix' | 'substring';
+
 export interface ProcessSummary {
   totalKb: number;
   matched: number;
