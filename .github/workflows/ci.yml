@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  build-and-test:
+  test:
     strategy:
       fail-fast: false
       matrix:
@@ -43,3 +43,13 @@ jobs:
           docker run --rm --network none \
             --volume "$PWD:/workspace:ro" --workdir /workspace \
             node:20-alpine /usr/local/bin/node scripts/smoke-process-snapshot.js --proc-fallback
+
+  # Rulesets require the exact context name "build-and-test"; matrix jobs
+  # report as "build-and-test (ubuntu-latest)" and never satisfy that check.
+  build-and-test:
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require matrix success
+        run: test "${{ needs.test.result }}" = "success"
