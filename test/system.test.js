@@ -8,6 +8,7 @@ const path = require('node:path');
 const {
   getEditorMemoryUsage,
   getProcessSnapshot,
+  PROC_READ_BATCH_SIZE,
   readLinuxProcSnapshot,
   runCommand,
 } = require('../out/system');
@@ -114,13 +115,16 @@ test('readLinuxProcSnapshot builds ps-compatible output from a proc tree', async
 });
 
 test('readLinuxProcSnapshot rejects when a /proc read hangs past the timeout', async () => {
+  let releaseHang;
   const readdir = async () => ['9999'];
   const readFile = async (filePath) => {
     if (String(filePath).endsWith(`${path.sep}status`)) {
       return 'Name:\thung\nVmRSS:\t    1024 kB\n';
     }
     // Simulate a kernel-blocked /proc/<pid>/cmdline read.
-    return new Promise(() => {});
+    return new Promise((resolve) => {
+      releaseHang = resolve;
+    });
   };
 
   const startedAt = Date.now();
@@ -129,6 +133,155 @@ test('readLinuxProcSnapshot rejects when a /proc read hangs past the timeout', a
     /timed out/
   );
   assert.ok(Date.now() - startedAt < 1000, 'fallback must not hang indefinitely');
+  releaseHang('/usr/bin/hung');
+  await new Promise((resolve) => setImmediate(resolve));
+});
+
+test('readLinuxProcSnapshot does not start another walk while a timed-out one is still running', async () => {
+  let releaseHang;
+  let readdirCalls = 0;
+  const readdir = async () => {
+    readdirCalls += 1;
+    return ['9999'];
+  };
+  const hangingReadFile = async (filePath) => {
+    if (String(filePath).endsWith(`${path.sep}status`)) {
+      return 'Name:\thung\nVmRSS:\t    1024 kB\n';
+    }
+    return new Promise((resolve) => {
+      releaseHang = resolve;
+    });
+  };
+
+  await assert.rejects(
+    () => readLinuxProcSnapshot('/proc-fake', 50, hangingReadFile, readdir),
+    /timed out/
+  );
+  assert.equal(readdirCalls, 1);
+
+  await assert.rejects(
+    () => readLinuxProcSnapshot('/proc-fake', 50, hangingReadFile, readdir),
+    /still in progress/
+  );
+  assert.equal(readdirCalls, 1, 'must not open more /proc reads while one is stuck');
+
+  releaseHang('/usr/bin/hung');
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const readyReadFile = async (filePath) => {
+    if (String(filePath).endsWith(`${path.sep}status`)) {
+      return 'Name:\tok\nVmRSS:\t      10 kB\n';
+    }
+    return '/bin/ok';
+  };
+  const output = await readLinuxProcSnapshot('/proc-fake', 1000, readyReadFile, async () => {
+    readdirCalls += 1;
+    return ['2'];
+  });
+  assert.match(output, /2 10 \/bin\/ok/);
+  assert.equal(readdirCalls, 2);
+});
+
+test('readLinuxProcSnapshot clears the mutex after readdir fails so a retry can run', async () => {
+  const unhandled = [];
+  const onUnhandled = (reason) => {
+    unhandled.push(reason);
+  };
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    await assert.rejects(
+      () =>
+        readLinuxProcSnapshot(
+          '/proc-fake',
+          1000,
+          async () => '',
+          async () => {
+            throw new Error('readdir failed');
+          }
+        ),
+      /readdir failed/
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(unhandled.length, 0);
+
+    const output = await readLinuxProcSnapshot(
+      '/proc-fake',
+      1000,
+      async (filePath) => {
+        if (String(filePath).endsWith(`${path.sep}status`)) {
+          return 'Name:\tok\nVmRSS:\t      10 kB\n';
+        }
+        return '/bin/ok';
+      },
+      async () => ['2']
+    );
+    assert.match(output, /2 10 \/bin\/ok/);
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+});
+
+test('timed-out /proc walk does not open files for later batches', async () => {
+  const pids = Array.from({ length: PROC_READ_BATCH_SIZE * 2 }, (_, index) => String(1000 + index));
+  const firstBatch = new Set(pids.slice(0, PROC_READ_BATCH_SIZE));
+  const releaseFirstBatch = [];
+  let openedAfterTimeout = 0;
+  let timedOut = false;
+
+  const readFile = async (filePath) => {
+    const segments = String(filePath).split(path.sep);
+    const pid = segments[segments.length - 2];
+    if (String(filePath).endsWith(`${path.sep}status`)) {
+      return 'Name:\tp\nVmRSS:\t      10 kB\n';
+    }
+    if (firstBatch.has(pid)) {
+      return new Promise((resolve) => {
+        releaseFirstBatch.push(() => resolve(`/bin/${pid}`));
+      });
+    }
+    if (timedOut) openedAfterTimeout += 1;
+    return `/bin/${pid}`;
+  };
+
+  await assert.rejects(
+    () => readLinuxProcSnapshot('/proc-fake', 50, readFile, async () => pids),
+    /timed out/
+  );
+  timedOut = true;
+  assert.ok(releaseFirstBatch.length > 0, 'first batch should have started before timeout');
+
+  for (const release of releaseFirstBatch) release();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  assert.equal(openedAfterTimeout, 0, 'must not schedule reads for later PID batches after timeout');
+});
+
+test('timed-out /proc walk does not open cmdline after a late status read', async () => {
+  let releaseStatus;
+  let cmdlineOpens = 0;
+
+  const readFile = async (filePath) => {
+    if (String(filePath).endsWith(`${path.sep}status`)) {
+      return new Promise((resolve) => {
+        releaseStatus = () => resolve('Name:\tp\nVmRSS:\t      10 kB\n');
+      });
+    }
+    cmdlineOpens += 1;
+    return '/bin/late';
+  };
+
+  await assert.rejects(
+    () => readLinuxProcSnapshot('/proc-fake', 50, readFile, async () => ['4242']),
+    /timed out/
+  );
+  assert.equal(typeof releaseStatus, 'function');
+  releaseStatus();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  assert.equal(cmdlineOpens, 0, 'must not open cmdline once the snapshot budget has expired');
 });
 
 test('getProcessSnapshot does not fall back to /proc after a ps timeout', async () => {
