@@ -9,7 +9,12 @@ import { ProcessSnapshot, EditorMemoryUsage } from './types';
 
 const MAX_PS_BUFFER_BYTES = 10 * 1024 * 1024;
 const PROCESS_COMMAND_TIMEOUT_MS = 10_000;
-const PROC_READ_BATCH_SIZE = 32;
+/**
+ * Cap concurrent /proc reads. Node's default libuv pool is 4 threads, so a batch
+ * of 8 can still saturate it if several cmdline reads block; this only reduces
+ * pressure versus scanning unbounded PIDs at once.
+ */
+export const PROC_READ_BATCH_SIZE = 8;
 const PROC_PID_PATTERN = /^\d+$/;
 const PROC_VM_RSS_PATTERN = /^VmRSS:[ \t]+(\d+)[ \t]+kB$/m;
 const WINDOWS_PROCESS_SNAPSHOT_SCRIPT =
@@ -44,9 +49,17 @@ const isCommandTimeoutError = (error: unknown): boolean => {
 type ProcReadFile = (filePath: string, encoding: 'utf8') => Promise<string>;
 type ProcReaddir = (dirPath: string) => Promise<string[]>;
 
-const withTimeout = <T>(timeoutMs: number, operation: Promise<T>, message: string): Promise<T> =>
+const withTimeout = <T>(
+  timeoutMs: number,
+  operation: Promise<T>,
+  message: string,
+  onTimeout?: () => void
+): Promise<T> =>
   new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    const timer = setTimeout(() => {
+      onTimeout?.();
+      reject(new Error(message));
+    }, timeoutMs);
     operation.then(
       (value) => {
         clearTimeout(timer);
@@ -62,7 +75,8 @@ const withTimeout = <T>(timeoutMs: number, operation: Promise<T>, message: strin
 const collectLinuxProcSnapshot = async (
   procRoot: string,
   readFile: ProcReadFile,
-  readdir: ProcReaddir
+  readdir: ProcReaddir,
+  signal?: AbortSignal
 ): Promise<string> => {
   const entries = await readdir(procRoot);
   const pids = entries.filter((entry) => PROC_PID_PATTERN.test(entry));
@@ -70,6 +84,9 @@ const collectLinuxProcSnapshot = async (
   const lines = ['PID RSS COMMAND'];
 
   for (let start = 0; start < pids.length; start += PROC_READ_BATCH_SIZE) {
+    // Stop scheduling further batches once the caller budget has expired.
+    if (signal?.aborted) break;
+
     const batch = pids.slice(start, start + PROC_READ_BATCH_SIZE);
     const processes = await Promise.all(
       batch.map(async (pid) => {
@@ -77,6 +94,8 @@ const collectLinuxProcSnapshot = async (
           const status = await readFile(path.join(procRoot, pid, 'status'), 'utf8');
           const rssMatch = status.match(PROC_VM_RSS_PATTERN);
           if (!rssMatch) return null;
+          // Status may complete after the budget expired; do not open cmdline then.
+          if (signal?.aborted) return null;
 
           const cmdline = await readFile(path.join(procRoot, pid, 'cmdline'), 'utf8');
           const command = cmdline.replace(/[\0\r\n]/g, ' ').trimEnd();
@@ -96,6 +115,10 @@ const collectLinuxProcSnapshot = async (
   return lines.join('\n');
 };
 
+// Kernel-blocked /proc reads cannot be cancelled. Keep at most one collect in
+// flight so a timed-out refresh cannot stack more libuv work on top.
+let linuxProcSnapshotInFlight: Promise<string> | null = null;
+
 /**
  * Reads the process list from /proc instead of `ps`. Used as a fallback on
  * Linux systems where `ps -ww -eo pid,rss,command` is unavailable or unsupported
@@ -103,20 +126,38 @@ const collectLinuxProcSnapshot = async (
  * as `ps` so the pure parser in lib.ts works unchanged.
  *
  * Bounded by `timeoutMs` so a stuck `/proc/<pid>/cmdline` read cannot leave
- * the status-bar refresh permanently in-flight. Kernel-blocked reads may continue
- * in the background, but the caller is released when the budget expires.
+ * the status-bar refresh permanently in-flight. On timeout, further batches are
+ * not scheduled; already-started reads may finish, and the mutex stays held
+ * until that collect settles.
  */
 export const readLinuxProcSnapshot = (
   procRoot: string = '/proc',
   timeoutMs: number = PROCESS_COMMAND_TIMEOUT_MS,
   readFile: ProcReadFile = (filePath, encoding) => fs.promises.readFile(filePath, encoding),
   readdir: ProcReaddir = (dirPath) => fs.promises.readdir(dirPath)
-): Promise<string> =>
-  withTimeout(
+): Promise<string> => {
+  if (linuxProcSnapshotInFlight) {
+    return Promise.reject(new Error('previous /proc snapshot still in progress'));
+  }
+
+  const controller = new AbortController();
+  const collect = collectLinuxProcSnapshot(procRoot, readFile, readdir, controller.signal);
+  // `.finally` returns a distinct promise. If `collect` rejects, that tracker
+  // would otherwise surface as an unhandled rejection even though callers await
+  // `withTimeout(collect)`.
+  const tracked = collect.finally(() => {
+    linuxProcSnapshotInFlight = null;
+  });
+  void tracked.catch(() => {});
+  linuxProcSnapshotInFlight = tracked;
+
+  return withTimeout(
     timeoutMs,
-    collectLinuxProcSnapshot(procRoot, readFile, readdir),
-    `reading /proc process snapshot timed out after ${timeoutMs}ms`
+    collect,
+    `reading /proc process snapshot timed out after ${timeoutMs}ms`,
+    () => controller.abort()
   );
+};
 
 export const getProcessSnapshot = async (
   execute: (executable: string, args: string[]) => Promise<string> = runCommand,

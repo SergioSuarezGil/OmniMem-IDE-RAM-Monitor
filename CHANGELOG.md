@@ -1,3 +1,9 @@
+## [1.1.2](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.1.1...v1.1.2) (2026-11-25)
+
+### Bug Fixes
+
+* avoid stacking /proc walks after a timed-out snapshot ([a4eb425](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/commit/a4eb425b8f74bf5f66b2197704289560beef5352))
+
 ## [1.1.1](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.1.0...v1.1.1) (2026-11-25)
 
 ### Bug Fixes
