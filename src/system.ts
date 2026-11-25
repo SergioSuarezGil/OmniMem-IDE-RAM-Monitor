@@ -96,6 +96,10 @@ const collectLinuxProcSnapshot = async (
   return lines.join('\n');
 };
 
+// Kernel-blocked /proc reads cannot be cancelled. Keep at most one collect in
+// flight so a timed-out refresh cannot stack more libuv work on top.
+let linuxProcSnapshotInFlight: Promise<string> | null = null;
+
 /**
  * Reads the process list from /proc instead of `ps`. Used as a fallback on
  * Linux systems where `ps -ww -eo pid,rss,command` is unavailable or unsupported
@@ -104,19 +108,30 @@ const collectLinuxProcSnapshot = async (
  *
  * Bounded by `timeoutMs` so a stuck `/proc/<pid>/cmdline` read cannot leave
  * the status-bar refresh permanently in-flight. Kernel-blocked reads may continue
- * in the background, but the caller is released when the budget expires.
+ * in the background, but the caller is released when the budget expires and a
+ * later call refuses to start another walk until the previous collect settles.
  */
 export const readLinuxProcSnapshot = (
   procRoot: string = '/proc',
   timeoutMs: number = PROCESS_COMMAND_TIMEOUT_MS,
   readFile: ProcReadFile = (filePath, encoding) => fs.promises.readFile(filePath, encoding),
   readdir: ProcReaddir = (dirPath) => fs.promises.readdir(dirPath)
-): Promise<string> =>
-  withTimeout(
+): Promise<string> => {
+  if (linuxProcSnapshotInFlight) {
+    return Promise.reject(new Error('previous /proc snapshot still in progress'));
+  }
+
+  const collect = collectLinuxProcSnapshot(procRoot, readFile, readdir);
+  linuxProcSnapshotInFlight = collect.finally(() => {
+    linuxProcSnapshotInFlight = null;
+  });
+
+  return withTimeout(
     timeoutMs,
-    collectLinuxProcSnapshot(procRoot, readFile, readdir),
+    collect,
     `reading /proc process snapshot timed out after ${timeoutMs}ms`
   );
+};
 
 export const getProcessSnapshot = async (
   execute: (executable: string, args: string[]) => Promise<string> = runCommand,

@@ -114,13 +114,16 @@ test('readLinuxProcSnapshot builds ps-compatible output from a proc tree', async
 });
 
 test('readLinuxProcSnapshot rejects when a /proc read hangs past the timeout', async () => {
+  let releaseHang;
   const readdir = async () => ['9999'];
   const readFile = async (filePath) => {
     if (String(filePath).endsWith(`${path.sep}status`)) {
       return 'Name:\thung\nVmRSS:\t    1024 kB\n';
     }
     // Simulate a kernel-blocked /proc/<pid>/cmdline read.
-    return new Promise(() => {});
+    return new Promise((resolve) => {
+      releaseHang = resolve;
+    });
   };
 
   const startedAt = Date.now();
@@ -129,6 +132,53 @@ test('readLinuxProcSnapshot rejects when a /proc read hangs past the timeout', a
     /timed out/
   );
   assert.ok(Date.now() - startedAt < 1000, 'fallback must not hang indefinitely');
+  releaseHang('/usr/bin/hung');
+  await new Promise((resolve) => setImmediate(resolve));
+});
+
+test('readLinuxProcSnapshot does not start another walk while a timed-out one is still running', async () => {
+  let releaseHang;
+  let readdirCalls = 0;
+  const readdir = async () => {
+    readdirCalls += 1;
+    return ['9999'];
+  };
+  const hangingReadFile = async (filePath) => {
+    if (String(filePath).endsWith(`${path.sep}status`)) {
+      return 'Name:\thung\nVmRSS:\t    1024 kB\n';
+    }
+    return new Promise((resolve) => {
+      releaseHang = resolve;
+    });
+  };
+
+  await assert.rejects(
+    () => readLinuxProcSnapshot('/proc-fake', 50, hangingReadFile, readdir),
+    /timed out/
+  );
+  assert.equal(readdirCalls, 1);
+
+  await assert.rejects(
+    () => readLinuxProcSnapshot('/proc-fake', 50, hangingReadFile, readdir),
+    /still in progress/
+  );
+  assert.equal(readdirCalls, 1, 'must not open more /proc reads while one is stuck');
+
+  releaseHang('/usr/bin/hung');
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const readyReadFile = async (filePath) => {
+    if (String(filePath).endsWith(`${path.sep}status`)) {
+      return 'Name:\tok\nVmRSS:\t      10 kB\n';
+    }
+    return '/bin/ok';
+  };
+  const output = await readLinuxProcSnapshot('/proc-fake', 1000, readyReadFile, async () => {
+    readdirCalls += 1;
+    return ['2'];
+  });
+  assert.match(output, /2 10 \/bin\/ok/);
+  assert.equal(readdirCalls, 2);
 });
 
 test('getProcessSnapshot does not fall back to /proc after a ps timeout', async () => {
