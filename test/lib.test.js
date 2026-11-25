@@ -117,7 +117,7 @@ test('summarizeProcessSnapshot uses the .app bundle root on macOS', () => {
   assert.deepEqual(result, { totalKb: 30000, matched: 2 });
 });
 
-test('summarizeProcessSnapshot falls back to path.dirname(execPath) on macOS if there is no .app bundle', () => {
+test('summarizeProcessSnapshot excludes nearby executables outside macOS app bundles', () => {
   const execPath = '/usr/local/bin/some-editor';
   const psOutput = ['PID RSS COMMAND', '1 5000 /usr/local/bin/some-editor', '2 7000 /usr/local/bin/some-editor-helper'].join(
     '\n'
@@ -125,7 +125,7 @@ test('summarizeProcessSnapshot falls back to path.dirname(execPath) on macOS if 
 
   const result = summarizeProcessSnapshot('darwin', execPath, psOutput);
 
-  assert.deepEqual(result, { totalKb: 12000, matched: 2 });
+  assert.deepEqual(result, { totalKb: 5000, matched: 1 });
 });
 
 test('summarizeProcessSnapshot matches by exact execPath on linux', () => {
@@ -183,4 +183,77 @@ test('summarizeProcessSnapshot delegates to Windows parsing by exact ExecutableP
   const result = summarizeProcessSnapshot('win32', execPath, jsonText);
 
   assert.deepEqual(result, { totalKb: 1024, matched: 1, parseError: false });
+});
+
+test('sumRssForMatchingProcesses prefix mode only counts argv0 matches', () => {
+  const psOutput = [
+    'PID RSS COMMAND',
+    '100 20000 /Applications/Windsurf.app/Contents/MacOS/Windsurf',
+    '101 5000 vim /Applications/Windsurf.app/notes.txt',
+    '102 7000 /usr/bin/some-other-process',
+  ].join('\n');
+
+  assert.deepEqual(
+    sumRssForMatchingProcesses(psOutput, '/Applications/Windsurf.app', 'prefix'),
+    { totalKb: 20000, matched: 1 }
+  );
+  assert.deepEqual(
+    sumRssForMatchingProcesses(psOutput, '/Applications/Windsurf.app', 'substring'),
+    { totalKb: 25000, matched: 2 }
+  );
+});
+
+test('sumRssForMatchingProcesses prefix mode requires a path boundary after the match', () => {
+  const psOutput = [
+    'PID RSS COMMAND',
+    '100 20000 /Applications/Windsurf.app/Contents/MacOS/Windsurf',
+    '101 9000 /Applications/Windsurf.app.backup/Contents/MacOS/Windsurf',
+  ].join('\n');
+
+  assert.deepEqual(
+    sumRssForMatchingProcesses(psOutput, '/Applications/Windsurf.app', 'prefix'),
+    { totalKb: 20000, matched: 1 }
+  );
+});
+
+test('summarizeProcessSnapshot on darwin ignores processes that only mention the bundle path', () => {
+  const execPath = '/Applications/Windsurf.app/Contents/MacOS/Windsurf';
+  const psOutput = [
+    'PID RSS COMMAND',
+    '1 20000 /Applications/Windsurf.app/Contents/MacOS/Windsurf',
+    '2 9000 vim /Applications/Windsurf.app/Contents/README',
+  ].join('\n');
+
+  assert.deepEqual(summarizeProcessSnapshot('darwin', execPath, psOutput), {
+    totalKb: 20000,
+    matched: 1,
+  });
+});
+
+test('summarizeProcessSnapshot ignores shell arguments when no editor process matches', () => {
+  const execPath = '/usr/share/windsurf/windsurf';
+  const psOutput = [
+    'PID RSS COMMAND',
+    '1 10000 /bin/sh -c "/usr/share/windsurf/windsurf --type=main"',
+  ].join('\n');
+
+  assert.deepEqual(summarizeProcessSnapshot('linux', execPath, psOutput), {
+    totalKb: 0,
+    matched: 0,
+  });
+});
+
+test('summarizeProcessSnapshot on darwin requires a path inside the exact app bundle', () => {
+  const execPath = '/Applications/Windsurf.app/Contents/MacOS/Windsurf';
+  const psOutput = [
+    'PID RSS COMMAND',
+    '1 9000 vim /Applications/Windsurf.app/Contents/README',
+    '2 8000 /Applications/Windsurf.app.backup/Contents/MacOS/Windsurf',
+    '3 7000 /Applications/Windsurf.app clone/Contents/MacOS/Windsurf',
+  ].join('\n');
+
+  assert.deepEqual(summarizeProcessSnapshot('darwin', execPath, psOutput), {
+    totalKb: 0,
+    matched: 0,
+  });
 });

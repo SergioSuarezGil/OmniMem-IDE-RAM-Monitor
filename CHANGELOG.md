@@ -1,3 +1,13 @@
+## [1.1.0](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.0.7...v1.1.0) (2026-11-25)
+
+### Features
+
+* improve process detection accuracy and snapshot reliability ([10515c3](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/commit/10515c3466687aa8ee239fa71c75a2d8f2da6833))
+
+### Bug Fixes
+
+* **ci:** pin release tags to push SHA and harden VSIX paths ([f276587](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/commit/f276587eb6205762ace6fe4b9e89a5f0030b8c8f))
+
 ## [1.0.7](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.0.6...v1.0.7) (2026-11-10)
 
 ### Bug Fixes
