@@ -11,7 +11,11 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -26,8 +30,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run compile
-
       - name: Test
         run: npm test
+
+      - name: Smoke test native process snapshot
+        shell: bash
+        run: '"$(command -v node)" scripts/smoke-process-snapshot.js'
+
+      - name: Smoke test Alpine /proc fallback
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm --network none \
+            --volume "$PWD:/workspace:ro" --workdir /workspace \
+            node:20-alpine /usr/local/bin/node scripts/smoke-process-snapshot.js --proc-fallback
