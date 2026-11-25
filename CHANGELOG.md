@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.1.0...v1.1.1) (2026-11-25)
+
+### Bug Fixes
+
+* bound Linux /proc snapshot reads with a timeout ([4267de7](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/commit/4267de7b606fb36f6686aedaecc4b5e1db5387c7))
+
 ## [1.1.0](https://github.com/SergioSuarezGil/OmniMem-IDE-RAM-Monitor/compare/v1.0.7...v1.1.0) (2026-11-25)
 
 ### Features

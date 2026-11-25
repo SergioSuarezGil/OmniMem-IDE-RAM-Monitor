@@ -112,3 +112,39 @@ test('readLinuxProcSnapshot builds ps-compatible output from a proc tree', async
     fs.rmSync(procRoot, { recursive: true, force: true });
   }
 });
+
+test('readLinuxProcSnapshot rejects when a /proc read hangs past the timeout', async () => {
+  const readdir = async () => ['9999'];
+  const readFile = async (filePath) => {
+    if (String(filePath).endsWith(`${path.sep}status`)) {
+      return 'Name:\thung\nVmRSS:\t    1024 kB\n';
+    }
+    // Simulate a kernel-blocked /proc/<pid>/cmdline read.
+    return new Promise(() => {});
+  };
+
+  const startedAt = Date.now();
+  await assert.rejects(
+    () => readLinuxProcSnapshot('/proc-fake', 50, readFile, readdir),
+    /timed out/
+  );
+  assert.ok(Date.now() - startedAt < 1000, 'fallback must not hang indefinitely');
+});
+
+test('getProcessSnapshot does not fall back to /proc after a ps timeout', async () => {
+  const timeoutError = Object.assign(new Error('ps timed out'), {
+    killed: true,
+    code: 'ETIMEDOUT',
+  });
+  let readProcCalls = 0;
+  const execute = async () => {
+    throw timeoutError;
+  };
+  const readProc = async () => {
+    readProcCalls += 1;
+    return 'should not be called';
+  };
+
+  await assert.rejects(() => getProcessSnapshot(execute, 'linux', readProc), /ps timed out/);
+  assert.equal(readProcCalls, 0);
+});

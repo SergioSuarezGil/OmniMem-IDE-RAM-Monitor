@@ -35,14 +35,36 @@ export const runCommand = (
     );
   });
 
-/**
- * Reads the process list from /proc instead of `ps`. Used as a fallback on
- * Linux systems where `ps -ww -eo pid,rss,command` is unavailable or unsupported
- * (e.g. Alpine's busybox ps). Emits the same "PID RSS COMMAND" text format
- * as `ps` so the pure parser in lib.ts works unchanged.
- */
-export const readLinuxProcSnapshot = async (procRoot: string = '/proc'): Promise<string> => {
-  const entries = await fs.promises.readdir(procRoot);
+const isCommandTimeoutError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as { killed?: boolean; code?: string };
+  return candidate.killed === true || candidate.code === 'ETIMEDOUT';
+};
+
+type ProcReadFile = (filePath: string, encoding: 'utf8') => Promise<string>;
+type ProcReaddir = (dirPath: string) => Promise<string[]>;
+
+const withTimeout = <T>(timeoutMs: number, operation: Promise<T>, message: string): Promise<T> =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    operation.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+
+const collectLinuxProcSnapshot = async (
+  procRoot: string,
+  readFile: ProcReadFile,
+  readdir: ProcReaddir
+): Promise<string> => {
+  const entries = await readdir(procRoot);
   const pids = entries.filter((entry) => PROC_PID_PATTERN.test(entry));
 
   const lines = ['PID RSS COMMAND'];
@@ -52,11 +74,11 @@ export const readLinuxProcSnapshot = async (procRoot: string = '/proc'): Promise
     const processes = await Promise.all(
       batch.map(async (pid) => {
         try {
-          const status = await fs.promises.readFile(path.join(procRoot, pid, 'status'), 'utf8');
+          const status = await readFile(path.join(procRoot, pid, 'status'), 'utf8');
           const rssMatch = status.match(PROC_VM_RSS_PATTERN);
           if (!rssMatch) return null;
 
-          const cmdline = await fs.promises.readFile(path.join(procRoot, pid, 'cmdline'), 'utf8');
+          const cmdline = await readFile(path.join(procRoot, pid, 'cmdline'), 'utf8');
           const command = cmdline.replace(/[\0\r\n]/g, ' ').trimEnd();
           return command ? `${pid} ${rssMatch[1]} ${command}` : null;
         } catch {
@@ -73,6 +95,28 @@ export const readLinuxProcSnapshot = async (procRoot: string = '/proc'): Promise
 
   return lines.join('\n');
 };
+
+/**
+ * Reads the process list from /proc instead of `ps`. Used as a fallback on
+ * Linux systems where `ps -ww -eo pid,rss,command` is unavailable or unsupported
+ * (e.g. Alpine's busybox ps). Emits the same "PID RSS COMMAND" text format
+ * as `ps` so the pure parser in lib.ts works unchanged.
+ *
+ * Bounded by `timeoutMs` so a stuck `/proc/<pid>/cmdline` read cannot leave
+ * the status-bar refresh permanently in-flight. Kernel-blocked reads may continue
+ * in the background, but the caller is released when the budget expires.
+ */
+export const readLinuxProcSnapshot = (
+  procRoot: string = '/proc',
+  timeoutMs: number = PROCESS_COMMAND_TIMEOUT_MS,
+  readFile: ProcReadFile = (filePath, encoding) => fs.promises.readFile(filePath, encoding),
+  readdir: ProcReaddir = (dirPath) => fs.promises.readdir(dirPath)
+): Promise<string> =>
+  withTimeout(
+    timeoutMs,
+    collectLinuxProcSnapshot(procRoot, readFile, readdir),
+    `reading /proc process snapshot timed out after ${timeoutMs}ms`
+  );
 
 export const getProcessSnapshot = async (
   execute: (executable: string, args: string[]) => Promise<string> = runCommand,
@@ -94,6 +138,8 @@ export const getProcessSnapshot = async (
     return { platform, raw };
   } catch (error) {
     if (platform !== 'linux') throw error;
+    // A timed-out `ps` already spent the budget; do not risk another unbounded wait.
+    if (isCommandTimeoutError(error)) throw error;
     // Minimal ps implementations may lack these options.
     const raw = await readProc();
     return { platform, raw };
